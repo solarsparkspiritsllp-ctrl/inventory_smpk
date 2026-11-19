@@ -1,0 +1,2392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PorkOps — Pork Buying, Smoke Yield, Expenses & P&L Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Supabase JS v2 SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            forest: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .print-shadow-none {
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-emerald-100 selection:text-emerald-900">
+
+  <!-- Toast Notification Banner -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none no-print"></div>
+
+  <!-- Custom Confirmation / Action Modal -->
+  <div id="custom-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 no-print">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 transform transition-all">
+      <h3 id="modal-title" class="text-lg font-bold text-slate-900">Confirm Action</h3>
+      <p id="modal-message" class="text-sm text-slate-600 mt-2">Are you sure you want to proceed?</p>
+      <div id="modal-input-container" class="mt-4 hidden">
+        <label id="modal-input-label" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Amount (₹)</label>
+        <input type="number" id="modal-input" step="0.01" min="0" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+        <p id="modal-input-hint" class="text-xs text-slate-500 mt-1"></p>
+      </div>
+      <div class="mt-6 flex items-center justify-end gap-3">
+        <button id="modal-cancel-btn" type="button" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">Cancel</button>
+        <button id="modal-confirm-btn" type="button" class="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-700 hover:bg-emerald-800 transition shadow-xs cursor-pointer">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Navigation Header -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3.5 gap-3">
+        <!-- Brand -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shadow-inner shrink-0">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-lg font-extrabold tracking-tight text-white">PorkOps Ledger</h1>
+              <span class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Assam / INR</span>
+            </div>
+            <p class="text-xs text-slate-400">Procurement, Smoke Yield, Expenses, Restaurant & Wholesale Credit</p>
+          </div>
+        </div>
+
+        <!-- Quick Data Actions & Cloud Status -->
+        <div class="flex flex-wrap items-center gap-2">
+          <span id="cloud-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800" title="Project ID: lowyxiwidpebycclfell">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Cloud Live (Supabase)
+          </span>
+          <button onclick="loadDemoData()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 transition cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Load Demo Data
+          </button>
+          <button onclick="exportJSONBackup()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 transition cursor-pointer" title="Download JSON Backup">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+            Export Backup
+          </button>
+          <button onclick="document.getElementById('restore-file-input').click()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 transition cursor-pointer" title="Upload and Restore JSON Backup">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Restore Backup
+          </button>
+          <input type="file" id="restore-file-input" accept=".json" class="hidden" onchange="restoreJSONBackup(event)" />
+          <button onclick="confirmClearAllData()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-rose-950/80 text-rose-300 border border-slate-700 hover:border-rose-800 transition cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Clear All
+          </button>
+        </div>
+      </div>
+
+      <!-- Module Navigation Tabs -->
+      <nav class="flex overflow-x-auto gap-1 pt-1 pb-0 -mb-px no-scrollbar" aria-label="Tabs">
+        <button onclick="switchTab('buying')" id="tab-btn-buying" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-semibold border-b-2 border-emerald-400 text-white transition cursor-pointer">
+          1. Buying & Smoke Yield
+        </button>
+        <button onclick="switchTab('expenses')" id="tab-btn-expenses" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition cursor-pointer">
+          2. Expenses Tracker
+        </button>
+        <button onclick="switchTab('restaurant')" id="tab-btn-restaurant" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition cursor-pointer">
+          3. Restaurant Dish Sales
+        </button>
+        <button onclick="switchTab('wholesale')" id="tab-btn-wholesale" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition cursor-pointer">
+          4. Wholesale & Credit Ledger
+        </button>
+        <button onclick="switchTab('reports')" id="tab-btn-reports" class="tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition cursor-pointer flex items-center gap-1.5">
+          <span>5. Reports & P&L Statement</span>
+          <span class="px-1.5 py-0.2 text-[10px] rounded-md bg-emerald-600 text-white">Export</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- DASHBOARD OVERVIEW KPI CARDS -->
+    <section aria-label="Dashboard Summary" class="no-print">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <!-- Card 1: Raw Pork Purchased -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Pork Purchased</span>
+            <span class="p-1.5 rounded-lg bg-slate-100 text-slate-700">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </span>
+          </div>
+          <div class="mt-2">
+            <p id="kpi-bought-kg" class="text-xl font-extrabold text-slate-900 tabular-nums">0.00 kg</p>
+          </div>
+          <p id="kpi-bought-inr" class="text-xs font-medium text-slate-600 mt-1 tabular-nums">Spend: ₹0.00</p>
+        </div>
+
+        <!-- Card 2: Smoked Yield Produced -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Smoked Yield</span>
+            <span class="p-1.5 rounded-lg bg-amber-50 text-amber-700">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/></svg>
+            </span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1.5">
+            <p id="kpi-smoked-kg" class="text-xl font-extrabold text-slate-900 tabular-nums">0.00 kg</p>
+            <span id="kpi-avg-yield" class="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 tabular-nums">0%</span>
+          </div>
+          <p id="kpi-smoked-cost" class="text-xs font-medium text-slate-600 mt-1 tabular-nums">Avg Cost: ₹0.00/kg</p>
+        </div>
+
+        <!-- Card 3: Expenses Total -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Expenses</span>
+            <span class="p-1.5 rounded-lg bg-rose-50 text-rose-700">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+          </div>
+          <p id="kpi-expenses-total" class="mt-2 text-xl font-extrabold text-rose-700 tabular-nums">₹0.00</p>
+          <p id="kpi-expenses-breakdown" class="text-[11px] font-medium text-slate-500 mt-1 truncate">Wood, Maint, CapEx...</p>
+        </div>
+
+        <!-- Card 4: Restaurant Sales -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Restaurant Sales</span>
+            <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            </span>
+          </div>
+          <p id="kpi-rest-rev" class="mt-2 text-xl font-extrabold text-slate-900 tabular-nums">₹0.00</p>
+          <p id="kpi-rest-kg" class="text-xs font-medium text-slate-600 mt-1 tabular-nums">Pork Used: 0.00 kg</p>
+        </div>
+
+        <!-- Card 5: Wholesale & Credit -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Wholesale / Credit</span>
+            <span class="p-1.5 rounded-lg bg-blue-50 text-blue-700">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </span>
+          </div>
+          <p id="kpi-other-rev" class="mt-2 text-xl font-extrabold text-slate-900 tabular-nums">₹0.00</p>
+          <div class="flex items-center justify-between text-[11px] mt-1 tabular-nums">
+            <span id="kpi-other-rec" class="text-emerald-700 font-medium">Rec: ₹0</span>
+            <span id="kpi-other-due" class="text-rose-600 font-semibold">Due: ₹0</span>
+          </div>
+        </div>
+
+        <!-- Card 6: Net Profit / Loss & Stock -->
+        <div class="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Net Profit / Loss</span>
+            <span id="kpi-pnl-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">PROFIT</span>
+          </div>
+          <p id="kpi-net-pnl" class="mt-2 text-xl font-extrabold text-emerald-400 tabular-nums">₹0.00</p>
+          <div class="mt-1 pt-1 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-300 tabular-nums">
+            <span>Smoked Bal: <strong id="kpi-stock-smoked" class="text-white">0.0 kg</strong></span>
+            <span>Sold: <strong id="kpi-total-dispatched" class="text-white">0.0 kg</strong></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 1: PORK BUYING & SMOKE YIELD TRACKER                           -->
+    <!-- ===================================================================== -->
+    <section id="section-buying" class="module-section space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Entry Form -->
+        <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <h2 class="text-base font-bold text-slate-900" id="buy-form-title">Record Pork Purchase & Smoke Batch</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Auto-calculates purchase total, smoked yield kg & effective smoked cost/kg</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold">Procurement</span>
+          </div>
+
+          <form id="buying-form" class="mt-4 space-y-3.5">
+            <input type="hidden" id="buy-edit-id" value="" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Purchase Date *</label>
+                <input type="date" id="buy-date" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Supplier / Source</label>
+                <input type="text" id="buy-supplier" placeholder="e.g., Sonapur Farm / Local" value="Local Supplier" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Raw Pork Quantity (kg) *</label>
+                <input type="number" id="buy-qty" step="0.01" min="0.01" required placeholder="0.00" oninput="recalcBuyingForm('qty')" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Price per kg (₹) *</label>
+                <input type="number" id="buy-price" step="0.01" min="0" required placeholder="e.g., 280" oninput="recalcBuyingForm('price')" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Total Amount (₹)</label>
+                <input type="number" id="buy-total" step="0.01" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900 tabular-nums" value="0.00" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Status *</label>
+                <select id="buy-payment" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                  <option value="Cash">Cash</option>
+                  <option value="Online">Online</option>
+                  <option value="Credit">Credit (Due)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Paid / Financed By *</label>
+                <select id="buy-paidby" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                  <option value="Spice Jewel">Spice Jewel</option>
+                  <option value="Digu">Digu</option>
+                  <option value="Chetan">Chetan</option>
+                  <option value="Koka">Koka</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Smoke Yield Auto-Calculation Box -->
+            <div class="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                  <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/></svg>
+                  Smoke Yield & Valuation
+                </span>
+                <span class="text-[11px] font-medium text-amber-800">Default ~65% yield</span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label class="block text-[11px] font-semibold text-amber-900 mb-1">Smoke Yield (%)</label>
+                  <input type="number" id="buy-yield-pct" step="0.1" min="0" max="100" value="65" oninput="recalcBuyingForm('pct')" class="w-full rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-amber-900 mb-1">Smoked Qty (kg)</label>
+                  <input type="number" id="buy-smoked-qty" step="0.01" min="0" placeholder="0.00" oninput="recalcBuyingForm('smokedQty')" class="w-full rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-sm font-bold text-amber-950 tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-amber-900 mb-1">Target Price/kg (₹)</label>
+                  <input type="number" id="buy-smoked-sell-price" step="0.01" min="0" value="550" oninput="recalcBuyingForm('sellPrice')" class="w-full rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                </div>
+              </div>
+
+              <div class="pt-2 border-t border-amber-200/80 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span class="text-amber-800 block">Eff. Smoked Cost/kg:</span>
+                  <strong id="buy-eff-cost-display" class="text-sm font-extrabold text-amber-950 tabular-nums">₹0.00 / kg</strong>
+                </div>
+                <div class="text-right">
+                  <span class="text-amber-800 block">Est. Batch Value:</span>
+                  <strong id="buy-est-value-display" class="text-sm font-extrabold text-emerald-800 tabular-nums">₹0.00</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 pt-1">
+              <button type="submit" id="buy-submit-btn" class="flex-1 py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold shadow-xs transition cursor-pointer">
+                Save Purchase & Smoke Batch
+              </button>
+              <button type="button" id="buy-cancel-edit-btn" onclick="resetBuyingForm()" class="hidden py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition cursor-pointer">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Purchases & Smoke Yield Ledger Table -->
+        <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
+          <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Purchase & Smoke Yield Batches</h3>
+              <p class="text-xs text-slate-500">Procurement history with funding source & smoked output</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="text" id="buy-search" oninput="renderBuyingTable()" placeholder="Search supplier or date..." class="rounded-xl border border-slate-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              <select id="buy-filter-pay" onchange="renderBuyingTable()" class="rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                <option value="ALL">All Payments</option>
+                <option value="Cash">Cash</option>
+                <option value="Online">Online</option>
+                <option value="Credit">Credit</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto flex-1">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <th class="py-3 px-4">Date & Supplier</th>
+                  <th class="py-3 px-3 text-right">Raw Qty</th>
+                  <th class="py-3 px-3 text-right">Total Paid</th>
+                  <th class="py-3 px-3">Status / Paid By</th>
+                  <th class="py-3 px-3 text-right">Smoked Yield</th>
+                  <th class="py-3 px-3 text-right">Eff. Cost/kg</th>
+                  <th class="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="buying-table-body" class="divide-y divide-slate-100 text-sm">
+              </tbody>
+              <tfoot id="buying-table-foot" class="bg-slate-50 border-t-2 border-slate-200 font-bold text-xs text-slate-800 tabular-nums">
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 2: EXPENSES TRACKER                                            -->
+    <!-- ===================================================================== -->
+    <section id="section-expenses" class="module-section hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Expense Entry Form -->
+        <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <h2 class="text-base font-bold text-slate-900" id="exp-form-title">Record Operating / CapEx Expense</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Track Wood, Maintenance, Others, and CapEx expenditures</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold">Expense Log</span>
+          </div>
+
+          <form id="expenses-form" class="mt-4 space-y-3.5">
+            <input type="hidden" id="exp-edit-id" value="" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Expense Date *</label>
+                <input type="date" id="exp-date" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Category *</label>
+                <select id="exp-category" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                  <option value="Wood">Wood (Smokinghouse Fuel)</option>
+                  <option value="Maintenance">Maintenance & Repairs</option>
+                  <option value="Others">Others (Misc)</option>
+                  <option value="CapEx">CapEx (Capital Expenditure)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Description / Particulars *</label>
+              <input type="text" id="exp-description" required placeholder="e.g., Oak firewood bundle (5 bags), freezer repair..." class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Amount (₹) *</label>
+                <input type="number" id="exp-amount" step="0.01" min="0.01" required placeholder="e.g., 2500" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-rose-700 tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Paid By / Financed By *</label>
+                <select id="exp-paidby" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                  <option value="Spice Jewel">Spice Jewel</option>
+                  <option value="Digu">Digu</option>
+                  <option value="Chetan">Chetan</option>
+                  <option value="Koka">Koka</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 pt-1">
+              <button type="submit" id="exp-submit-btn" class="flex-1 py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold shadow-xs transition cursor-pointer">
+                Save Expense Entry
+              </button>
+              <button type="button" id="exp-cancel-edit-btn" onclick="resetExpensesForm()" class="hidden py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition cursor-pointer">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Expenses Table & Summaries -->
+        <div class="lg:col-span-7 space-y-6">
+          <!-- Expense Category & Payer Breakdown Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Expenses by Category</h3>
+              <div id="exp-cat-summary" class="space-y-1.5 text-xs font-medium text-slate-700 tabular-nums"></div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Expenses by Payer</h3>
+              <div id="exp-payer-summary" class="space-y-1.5 text-xs font-medium text-slate-700 tabular-nums"></div>
+            </div>
+          </div>
+
+          <!-- Expenses Table -->
+          <div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h3 class="text-base font-bold text-slate-900">Expenses Ledger Log</h3>
+              <div class="flex items-center gap-2">
+                <input type="text" id="exp-search" oninput="renderExpensesTable()" placeholder="Search description, category..." class="rounded-xl border border-slate-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                <select id="exp-filter-cat" onchange="renderExpensesTable()" class="rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                  <option value="ALL">All Categories</option>
+                  <option value="Wood">Wood</option>
+                  <option value="Maintenance">Maintenance</option>
+                  <option value="Others">Others</option>
+                  <option value="CapEx">CapEx</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto flex-1 max-h-[360px]">
+              <table class="w-full text-left border-collapse">
+                <thead class="sticky top-0 bg-slate-50 z-10">
+                  <tr class="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th class="py-2.5 px-4">Date & Category</th>
+                    <th class="py-2.5 px-3">Description</th>
+                    <th class="py-2.5 px-3">Paid By</th>
+                    <th class="py-2.5 px-3 text-right">Amount</th>
+                    <th class="py-2.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="expenses-table-body" class="divide-y divide-slate-100 text-sm">
+                </tbody>
+                <tfoot id="expenses-table-foot" class="bg-slate-50 border-t-2 border-slate-200 font-bold text-xs text-slate-800 tabular-nums">
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 3: RESTAURANT SALES (ITEM / DISH-WISE)                         -->
+    <!-- ===================================================================== -->
+    <section id="section-restaurant" class="module-section hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Restaurant Dish Entry Form -->
+        <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6">
+          <div class="pb-4 border-b border-slate-100">
+            <h2 class="text-base font-bold text-slate-900">Record Restaurant Item-Wise Sale</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Track dish revenue alongside exact pork quantity consumed per dish</p>
+          </div>
+
+          <form id="restaurant-form" class="mt-4 space-y-3.5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Sale Date *</label>
+                <input type="date" id="rest-date" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Mode *</label>
+                <select id="rest-payment" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                  <option value="Cash">Cash</option>
+                  <option value="Online">Online (UPI / Card)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Restaurant Dish / Item Name *</label>
+              <input type="text" id="rest-dish" list="dish-presets" required placeholder="Select or type dish name..." class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              <datalist id="dish-presets">
+                <option value="Smoked pork dry fry / chilli">
+                <option value="Smoked pork dry fry / chilli Half">
+                <option value="Smoked pork fried rice">
+                <option value="Smoked pork noodles">
+              </datalist>
+              <div class="flex flex-wrap gap-1.5 mt-2">
+                <button type="button" onclick="setDishPreset('Smoked pork dry fry / chilli', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Dry Fry / Chilli</button>
+                <button type="button" onclick="setDishPreset('Smoked pork dry fry / chilli Half', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Chilli (Half)</button>
+                <button type="button" onclick="setDishPreset('Smoked pork fried rice', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Fried Rice</button>
+                <button type="button" onclick="setDishPreset('Smoked pork noodles', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Noodles</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Pork Type Used *</label>
+                <select id="rest-pork-type" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                  <option value="Smoked Pork">Smoked Pork</option>
+                  <option value="Raw Pork">Raw Pork</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Pork Qty Used (kg) *</label>
+                <input type="number" id="rest-pork-qty" step="0.01" min="0.01" required placeholder="e.g., 2.50" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Plates / Portions Sold</label>
+                <input type="number" id="rest-portions" step="1" min="1" placeholder="e.g., 12" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Total Dish Sale Amount (₹) *</label>
+                <input type="number" id="rest-amount" step="0.01" min="0" required placeholder="e.g., 3600" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-emerald-800 tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+            </div>
+
+            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold shadow-xs transition cursor-pointer">
+              Add Restaurant Dish Sale
+            </button>
+          </form>
+        </div>
+
+        <!-- Right Column: Aggregated Dish Breakdown + Detailed Sales Log -->
+        <div class="lg:col-span-7 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-bold text-slate-900">Item-Wise Kitchen Consumption & Revenue Summary</h3>
+                <p class="text-xs text-slate-500">Aggregated pork usage and revenue yield per menu dish</p>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th class="py-2.5 px-4">Dish / Menu Item</th>
+                    <th class="py-2.5 px-3 text-right">Portions</th>
+                    <th class="py-2.5 px-3 text-right">Pork Used (kg)</th>
+                    <th class="py-2.5 px-3 text-right">Revenue (₹)</th>
+                    <th class="py-2.5 px-4 text-right">Rev / kg Pork</th>
+                  </tr>
+                </thead>
+                <tbody id="rest-summary-body" class="divide-y divide-slate-100 text-sm">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <h3 class="text-base font-bold text-slate-900">Restaurant Sales Log</h3>
+              <input type="text" id="rest-search" oninput="renderRestaurantTables()" placeholder="Filter dish or date..." class="rounded-xl border border-slate-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th class="py-2.5 px-4">Date</th>
+                    <th class="py-2.5 px-3">Dish Item</th>
+                    <th class="py-2.5 px-3">Pork Type</th>
+                    <th class="py-2.5 px-3 text-right">Used (kg)</th>
+                    <th class="py-2.5 px-3 text-right">Sale Amt</th>
+                    <th class="py-2.5 px-3">Mode</th>
+                    <th class="py-2.5 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="rest-log-body" class="divide-y divide-slate-100 text-sm">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 4: WHOLESALE & CREDIT LEDGER                                   -->
+    <!-- ===================================================================== -->
+    <section id="section-wholesale" class="module-section hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Customer Sale & Credit Entry Form -->
+        <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6">
+          <div class="pb-4 border-b border-slate-100">
+            <h2 class="text-base font-bold text-slate-900">Record Wholesale / Customer Sale</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Auto-calculates total bill & pending credit balance</p>
+          </div>
+
+          <form id="wholesale-form" class="mt-4 space-y-3.5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Sale Date *</label>
+                <input type="date" id="ws-date" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Pork Type *</label>
+                <select id="ws-pork-type" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                  <option value="Smoked Pork">Smoked Pork</option>
+                  <option value="Raw Pork">Raw Pork</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Customer Name *</label>
+                <input type="text" id="ws-name" required placeholder="e.g., Biren Gogoi / Hotel Hornbill" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Contact Number *</label>
+                <input type="tel" id="ws-contact" required placeholder="e.g., 98640-XXXXX" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Qty (kg) *</label>
+                <input type="number" id="ws-qty" step="0.01" min="0.01" required placeholder="0.00" oninput="recalcWholesaleForm()" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Price / kg (₹) *</label>
+                <input type="number" id="ws-price" step="0.01" min="0" required placeholder="550" oninput="recalcWholesaleForm()" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Total (₹)</label>
+                <input type="number" id="ws-total" readonly value="0.00" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900 tabular-nums" />
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-emerald-800 mb-1">Received Amt (₹) *</label>
+                <input type="number" id="ws-received" step="0.01" min="0" required value="0" oninput="recalcWholesaleForm()" class="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm font-bold text-emerald-800 tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                <button type="button" onclick="markWholesaleFullPaid()" class="mt-1 text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer">Full Paid (Copy Total)</button>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-rose-800 mb-1">Credit Due (₹)</label>
+                <input type="number" id="ws-credit" readonly value="0.00" class="w-full rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-sm font-extrabold text-rose-700 tabular-nums" />
+                <span id="ws-status-preview" class="mt-1 inline-block text-[11px] font-semibold text-slate-500">Status: Pending</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Note / Remarks</label>
+              <input type="text" id="ws-note" placeholder="e.g., Promise to pay by Friday, GPay, wedding order..." class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+            </div>
+
+            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold shadow-xs transition cursor-pointer">
+              Save Customer Sale Entry
+            </button>
+          </form>
+        </div>
+
+        <!-- Customer Credit & Sales Ledger Table -->
+        <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
+          <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Customer Sales & Credit Ledger</h3>
+              <p class="text-xs text-slate-500">Track buyer balances and settle pending credits</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="text" id="ws-search" oninput="renderWholesaleTable()" placeholder="Search name, phone, note..." class="rounded-xl border border-slate-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              <select id="ws-filter-status" onchange="renderWholesaleTable()" class="rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                <option value="ALL">All Status</option>
+                <option value="DUE">Credit / Due Only</option>
+                <option value="PAID">Paid Only</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto flex-1">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <th class="py-3 px-4">Date & Customer</th>
+                  <th class="py-3 px-3">Item & Qty</th>
+                  <th class="py-3 px-3 text-right">Total Bill</th>
+                  <th class="py-3 px-3 text-right">Received</th>
+                  <th class="py-3 px-3 text-right">Credit Due</th>
+                  <th class="py-3 px-3">Status / Note</th>
+                  <th class="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="wholesale-table-body" class="divide-y divide-slate-100 text-sm">
+              </tbody>
+              <tfoot id="wholesale-table-foot" class="bg-slate-50 border-t-2 border-slate-200 font-bold text-xs text-slate-800 tabular-nums">
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 5: REPORTS & PROFIT AND LOSS (P&L) STATEMENT                   -->
+    <!-- ===================================================================== -->
+    <section id="section-reports" class="module-section hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 no-print">
+        <div class="flex flex-wrap items-center gap-3">
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Report Period Type</label>
+            <div class="inline-flex rounded-xl bg-slate-100 p-1">
+              <button type="button" onclick="setReportPeriodType('daily')" id="rep-type-daily" class="rep-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-xs transition cursor-pointer">Daily</button>
+              <button type="button" onclick="setReportPeriodType('monthly')" id="rep-type-monthly" class="rep-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer">Monthly</button>
+              <button type="button" onclick="setReportPeriodType('annual')" id="rep-type-annual" class="rep-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer">Annual</button>
+              <button type="button" onclick="setReportPeriodType('all')" id="rep-type-all" class="rep-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer">All Time</button>
+            </div>
+          </div>
+
+          <div id="rep-picker-daily">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Select Date</label>
+            <input type="date" id="rep-date-input" onchange="renderReport()" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+          </div>
+
+          <div id="rep-picker-monthly" class="hidden">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Select Month</label>
+            <input type="month" id="rep-month-input" onchange="renderReport()" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+          </div>
+
+          <div id="rep-picker-annual" class="hidden">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Select Year</label>
+            <select id="rep-year-input" onchange="renderReport()" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600"></select>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button type="button" onclick="exportReportToCSV()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs transition cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Export Full Report (CSV)
+          </button>
+          <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-xs transition cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            Print / Save PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 print-shadow-none">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 gap-2">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-widest text-emerald-700">Financial, Inventory & Expense Statement</span>
+            <h2 id="report-heading" class="text-xl font-extrabold text-slate-900 mt-0.5">Profit & Loss Statement</h2>
+          </div>
+          <div class="sm:text-right">
+            <span id="report-period-badge" class="inline-block px-3 py-1 rounded-lg bg-slate-100 text-slate-800 text-xs font-bold">Period: Today</span>
+            <p class="text-[11px] text-slate-500 mt-1">Currency: Indian Rupee (INR ₹)</p>
+          </div>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200 pb-2">1. Gross Revenue (Sales)</h3>
+            <dl class="mt-3 space-y-2.5 text-sm tabular-nums">
+              <div class="flex justify-between">
+                <dt class="text-slate-600">Restaurant Item Sales</dt>
+                <dd id="pnl-rest-rev" class="font-semibold text-slate-900">₹0.00</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-slate-600">Wholesale / Other Sales</dt>
+                <dd id="pnl-other-rev" class="font-semibold text-slate-900">₹0.00</dd>
+              </div>
+              <div class="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
+                <dt>Total Gross Revenue</dt>
+                <dd id="pnl-total-rev" class="text-emerald-700">₹0.00</dd>
+              </div>
+              <div class="pt-2 border-t border-dashed border-slate-200 text-xs space-y-1">
+                <div class="flex justify-between text-emerald-700">
+                  <span>Cash / Online Collected:</span>
+                  <span id="pnl-cash-collected" class="font-semibold">₹0.00</span>
+                </div>
+                <div class="flex justify-between text-rose-600">
+                  <span>Pending Credit Due:</span>
+                  <span id="pnl-pending-credit" class="font-semibold">₹0.00</span>
+                </div>
+              </div>
+            </dl>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200 pb-2">2. Operating Costs & Expenses</h3>
+            <dl class="mt-3 space-y-2.5 text-sm tabular-nums">
+              <div class="flex justify-between">
+                <dt class="text-slate-600">Pork Purchases (COGS)</dt>
+                <dd id="pnl-total-cost" class="font-semibold text-slate-900">₹0.00</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-slate-600">Operating Expenses (Wood, Maint...)</dt>
+                <dd id="pnl-total-exp" class="font-semibold text-rose-700">₹0.00</dd>
+              </div>
+              <div class="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
+                <dt>Total Outflows (Cost + Expenses)</dt>
+                <dd id="pnl-total-outflows" class="text-rose-700">₹0.00</dd>
+              </div>
+              <div class="pt-2 border-t border-dashed border-slate-200 text-xs space-y-1">
+                <div class="flex justify-between text-slate-600">
+                  <span>Raw Pork Bought:</span>
+                  <span id="pnl-raw-kg" class="font-semibold">0.00 kg</span>
+                </div>
+                <div class="flex justify-between text-amber-800">
+                  <span>Smoked Yield Produced:</span>
+                  <span id="pnl-smoked-kg" class="font-semibold">0.00 kg</span>
+                </div>
+              </div>
+            </dl>
+          </div>
+
+          <div class="rounded-xl border-2 border-slate-900 p-4 bg-slate-900 text-white flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">3. Net Profit & Loss</h3>
+                <span id="pnl-margin-badge" class="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 tabular-nums">Margin: 0.0%</span>
+              </div>
+              <div class="mt-4">
+                <span class="text-xs text-slate-400">Net Profit / (Loss)</span>
+                <p id="pnl-net-profit" class="text-3xl font-extrabold text-emerald-400 tabular-nums mt-0.5">₹0.00</p>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800 space-y-1 text-xs tabular-nums">
+              <div class="flex justify-between text-slate-300">
+                <span>Restaurant Pork Used:</span>
+                <span id="pnl-rest-kg" class="font-bold text-white">0.00 kg</span>
+              </div>
+              <div class="flex justify-between text-slate-300">
+                <span>Wholesale Pork Sold:</span>
+                <span id="pnl-other-kg" class="font-bold text-white">0.00 kg</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">Expenses Breakdown by Category</h4>
+            <div id="rep-exp-cat-list" class="space-y-1 text-xs text-slate-700 tabular-nums"></div>
+          </div>
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">Expenses Breakdown by Payer</h4>
+            <div id="rep-exp-payer-list" class="space-y-1 text-xs text-slate-700 tabular-nums"></div>
+          </div>
+        </div>
+
+        <div class="mt-8 space-y-8">
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 mb-2.5 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-slate-700"></span>
+              A. Pork Buying & Smoke Yield Details
+            </h4>
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 font-bold uppercase text-slate-500">
+                    <th class="py-2.5 px-3">Date</th>
+                    <th class="py-2.5 px-3">Supplier</th>
+                    <th class="py-2.5 px-3 text-right">Raw Qty (kg)</th>
+                    <th class="py-2.5 px-3 text-right">Total Amt</th>
+                    <th class="py-2.5 px-3">Status / Paid By</th>
+                    <th class="py-2.5 px-3 text-right">Smoked Qty (kg)</th>
+                    <th class="py-2.5 px-3 text-right">Eff. Cost/kg</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-buy-body" class="divide-y divide-slate-100 tabular-nums"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 mb-2.5 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-rose-600"></span>
+              B. Operating Expenses Details
+            </h4>
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 font-bold uppercase text-slate-500">
+                    <th class="py-2.5 px-3">Date</th>
+                    <th class="py-2.5 px-3">Category</th>
+                    <th class="py-2.5 px-3">Description</th>
+                    <th class="py-2.5 px-3">Paid By</th>
+                    <th class="py-2.5 px-3 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-exp-body" class="divide-y divide-slate-100 tabular-nums"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 mb-2.5 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              C. Restaurant Item-Wise Sales & Pork Consumption
+            </h4>
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 font-bold uppercase text-slate-500">
+                    <th class="py-2.5 px-3">Date</th>
+                    <th class="py-2.5 px-3">Dish Item</th>
+                    <th class="py-2.5 px-3">Pork Type</th>
+                    <th class="py-2.5 px-3 text-right">Used (kg)</th>
+                    <th class="py-2.5 px-3 text-right">Portions</th>
+                    <th class="py-2.5 px-3 text-right">Sale Amount</th>
+                    <th class="py-2.5 px-3">Mode</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-rest-body" class="divide-y divide-slate-100 tabular-nums"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 mb-2.5 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+              D. Wholesale & Credit Ledger Sales
+            </h4>
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 font-bold uppercase text-slate-500">
+                    <th class="py-2.5 px-3">Date</th>
+                    <th class="py-2.5 px-3">Customer Name</th>
+                    <th class="py-2.5 px-3">Contact</th>
+                    <th class="py-2.5 px-3">Type</th>
+                    <th class="py-2.5 px-3 text-right">Qty (kg)</th>
+                    <th class="py-2.5 px-3 text-right">Total</th>
+                    <th class="py-2.5 px-3 text-right">Received</th>
+                    <th class="py-2.5 px-3 text-right">Credit Due</th>
+                    <th class="py-2.5 px-3">Note</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-ws-body" class="divide-y divide-slate-100 tabular-nums"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-4 mt-8 no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+      <span id="backup-status-text">PorkOps Management Portal • Real-Time Supabase Sync Active (lowyxiwidpebycclfell)</span>
+      <span>Tip: Regularly use <strong>Export Backup</strong> to save JSON snapshots to your device</span>
+    </div>
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- APPLICATION & SUPABASE REAL-TIME CLOUD JAVASCRIPT LOGIC               -->
+  <!-- ===================================================================== -->
+  <script>
+    // =========================================================================
+    // SUPABASE INITIALIZATION & CONFIGURATION
+    // =========================================================================
+    const SUPABASE_PROJECT_ID = "lowyxiwidpebycclfell";
+    const SUPABASE_URL = `https://${SUPABASE_PROJECT_ID}.supabase.co`;
+    const SUPABASE_API_KEY = "sb_publishable_MrrM9QrxHd23ltWMh_ezEQ_nvM3BavD";
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_API_KEY, {
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
+      }
+    });
+
+    const TABLES = {
+      purchases: { table: 'porkops_purchases', stateKey: 'purchases' },
+      expenses: { table: 'porkops_expenses', stateKey: 'expenses' },
+      restaurantSales: { table: 'porkops_restaurant', stateKey: 'restaurantSales' },
+      wholesaleSales: { table: 'porkops_wholesale', stateKey: 'wholesaleSales' }
+    };
+
+    // Application State
+    let state = {
+      purchases: [],
+      expenses: [],
+      restaurantSales: [],
+      wholesaleSales: [],
+      activeTab: 'buying',
+      reportPeriodType: 'daily'
+    };
+
+    // Formatting Helpers
+    const formatINR = (num) => {
+      const val = Number(num) || 0;
+      return '₹' + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const formatKg = (num) => {
+      const val = Number(num) || 0;
+      return val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg';
+    };
+
+    const getTodayISO = () => {
+      const d = new Date();
+      const offset = d.getTimezoneOffset();
+      const local = new Date(d.getTime() - (offset * 60 * 1000));
+      return local.toISOString().split('T')[0];
+    };
+
+    const getCurrentMonthISO = () => getTodayISO().slice(0, 7);
+    const getCurrentYear = () => new Date().getFullYear().toString();
+
+    const escapeHTML = (str) => {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    };
+
+    // Toast Notification
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colors = type === 'error'
+        ? 'bg-rose-900 text-white border-rose-700'
+        : 'bg-slate-900 text-white border-emerald-500/50';
+      toast.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2 transition-all transform translate-y-2 opacity-0 ${colors}`;
+      toast.innerHTML = `
+        <span class="w-2 h-2 rounded-full ${type === 'error' ? 'bg-rose-400' : 'bg-emerald-400'}"></span>
+        <span>${escapeHTML(message)}</span>
+      `;
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Custom Modal Helper
+    function openModal({ title, message, showInput = false, inputLabel = '', inputDefault = '', inputHint = '', confirmText = 'Confirm', confirmClass = 'bg-emerald-700 hover:bg-emerald-800', onConfirm }) {
+      const modal = document.getElementById('custom-modal');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-message').textContent = message;
+
+      const inputContainer = document.getElementById('modal-input-container');
+      const inputEl = document.getElementById('modal-input');
+      if (showInput) {
+        inputContainer.classList.remove('hidden');
+        document.getElementById('modal-input-label').textContent = inputLabel;
+        inputEl.value = inputDefault;
+        document.getElementById('modal-input-hint').textContent = inputHint;
+      } else {
+        inputContainer.classList.add('hidden');
+      }
+
+      const confirmBtn = document.getElementById('modal-confirm-btn');
+      confirmBtn.textContent = confirmText;
+      confirmBtn.className = `px-4 py-2 rounded-xl text-sm font-semibold text-white transition shadow-xs cursor-pointer ${confirmClass}`;
+
+      const closeModal = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      };
+
+      document.getElementById('modal-cancel-btn').onclick = closeModal;
+      confirmBtn.onclick = () => {
+        const val = showInput ? parseFloat(inputEl.value) : true;
+        closeModal();
+        if (onConfirm) onConfirm(val);
+      };
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (showInput) setTimeout(() => inputEl.focus(), 50);
+    }
+
+    // =========================================================================
+    // REAL-TIME SUPABASE SYNC (INITIAL FETCH + POSTGRES_CHANGES)
+    // =========================================================================
+    async function fetchTableData(tableName, stateKey) {
+      const { data, error } = await supabaseClient
+        .from(tableName)
+        .select('id, data');
+
+      if (error) {
+        console.error(`Error loading ${tableName}:`, error);
+        showToast(`Cloud load error (${tableName}): ${error.message}`, 'error');
+        return;
+      }
+
+      state[stateKey] = (data || []).map(row => ({ id: row.id, ...row.data }));
+      refreshAllUI();
+    }
+
+    async function initCloudListeners() {
+      const badge = document.getElementById('cloud-status-badge');
+
+      // Initial load of all tables
+      await Promise.all(
+        Object.values(TABLES).map(cfg => fetchTableData(cfg.table, cfg.stateKey))
+      );
+
+      // Subscribe to real-time changes across all four tables
+      const channel = supabaseClient.channel('porkops-realtime-sync');
+
+      Object.values(TABLES).forEach(cfg => {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: cfg.table },
+          (payload) => {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+              const updatedItem = { id: payload.new.id, ...payload.new.data };
+              const idx = state[cfg.stateKey].findIndex(item => item.id === updatedItem.id);
+              if (idx >= 0) {
+                state[cfg.stateKey][idx] = updatedItem;
+              } else {
+                state[cfg.stateKey].push(updatedItem);
+              }
+            } else if (payload.eventType === 'DELETE') {
+              const deletedId = payload.old?.id;
+              if (deletedId) {
+                state[cfg.stateKey] = state[cfg.stateKey].filter(item => item.id !== deletedId);
+              }
+            }
+            refreshAllUI();
+          }
+        );
+      });
+
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>Cloud Live (Supabase)`;
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span>Cloud Polling`;
+        }
+      });
+    }
+
+    async function upsertRecordToCloud(tableName, stateKey, record) {
+      try {
+        const { error } = await supabaseClient
+          .from(tableName)
+          .upsert({ id: record.id, data: record }, { onConflict: 'id' });
+
+        if (error) throw error;
+
+        // Optimistically update local state immediately while realtime broadcasts to other clients
+        const idx = state[stateKey].findIndex(item => item.id === record.id);
+        if (idx >= 0) state[stateKey][idx] = record;
+        else state[stateKey].push(record);
+        refreshAllUI();
+      } catch (e) {
+        showToast('Failed to save to Supabase cloud: ' + e.message, 'error');
+      }
+    }
+
+    async function deleteRecordFromCloud(tableName, stateKey, id) {
+      try {
+        const { error } = await supabaseClient
+          .from(tableName)
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        state[stateKey] = state[stateKey].filter(item => item.id !== id);
+        refreshAllUI();
+      } catch (e) {
+        showToast('Failed to delete from Supabase cloud: ' + e.message, 'error');
+      }
+    }
+
+    // Cloud Save & Delete Helpers
+    const savePurchaseToCloud = (record) => upsertRecordToCloud(TABLES.purchases.table, TABLES.purchases.stateKey, record);
+    const deletePurchaseFromCloud = (id) => deleteRecordFromCloud(TABLES.purchases.table, TABLES.purchases.stateKey, id);
+
+    const saveExpenseToCloud = (record) => upsertRecordToCloud(TABLES.expenses.table, TABLES.expenses.stateKey, record);
+    const deleteExpenseFromCloud = (id) => deleteRecordFromCloud(TABLES.expenses.table, TABLES.expenses.stateKey, id);
+
+    const saveRestaurantToCloud = (record) => upsertRecordToCloud(TABLES.restaurantSales.table, TABLES.restaurantSales.stateKey, record);
+    const deleteRestaurantFromCloud = (id) => deleteRecordFromCloud(TABLES.restaurantSales.table, TABLES.restaurantSales.stateKey, id);
+
+    const saveWholesaleToCloud = (record) => upsertRecordToCloud(TABLES.wholesaleSales.table, TABLES.wholesaleSales.stateKey, record);
+    const deleteWholesaleFromCloud = (id) => deleteRecordFromCloud(TABLES.wholesaleSales.table, TABLES.wholesaleSales.stateKey, id);
+
+    // JSON Backup & Restore
+    function exportJSONBackup() {
+      const backupData = {
+        version: '3.0-supabase-realtime',
+        projectId: SUPABASE_PROJECT_ID,
+        exportDate: new Date().toISOString(),
+        purchases: state.purchases,
+        expenses: state.expenses,
+        restaurantSales: state.restaurantSales,
+        wholesaleSales: state.wholesaleSales
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `PorkOps_Supabase_Backup_${getTodayISO()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('JSON Backup downloaded successfully!');
+    }
+
+    function restoreJSONBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!parsed.purchases || !parsed.restaurantSales || !parsed.wholesaleSales) {
+            throw new Error('Invalid PorkOps backup file format.');
+          }
+          openModal({
+            title: 'Confirm Cloud Restore',
+            message: `This will push backup data to your live Supabase cloud database (${SUPABASE_PROJECT_ID}). Purchases: ${parsed.purchases.length}, Expenses: ${(parsed.expenses || []).length}, Restaurant: ${parsed.restaurantSales.length}, Wholesale: ${parsed.wholesaleSales.length}. Proceed?`,
+            confirmText: 'Upload to Cloud',
+            confirmClass: 'bg-emerald-700 hover:bg-emerald-800',
+            onConfirm: async () => {
+              showToast('Uploading backup to Supabase cloud...');
+              const batchPromises = [];
+              (parsed.purchases || []).forEach(p => batchPromises.push(supabaseClient.from(TABLES.purchases.table).upsert({ id: p.id, data: p })));
+              (parsed.expenses || []).forEach(x => batchPromises.push(supabaseClient.from(TABLES.expenses.table).upsert({ id: x.id, data: x })));
+              (parsed.restaurantSales || []).forEach(r => batchPromises.push(supabaseClient.from(TABLES.restaurantSales.table).upsert({ id: r.id, data: r })));
+              (parsed.wholesaleSales || []).forEach(w => batchPromises.push(supabaseClient.from(TABLES.wholesaleSales.table).upsert({ id: w.id, data: w })));
+              await Promise.all(batchPromises);
+              await Promise.all(Object.values(TABLES).map(cfg => fetchTableData(cfg.table, cfg.stateKey)));
+              showToast('Supabase cloud database restored from backup!');
+              event.target.value = '';
+            }
+          });
+        } catch (err) {
+          showToast('Restore failed: ' + err.message, 'error');
+          event.target.value = '';
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Tab Navigation
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      document.querySelectorAll('.module-section').forEach(sec => sec.classList.add('hidden'));
+      document.getElementById(`section-${tabId}`).classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-emerald-400', 'text-white');
+        btn.classList.add('border-transparent', 'text-slate-400');
+      });
+      const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+      activeBtn.classList.remove('border-transparent', 'text-slate-400');
+      activeBtn.classList.add('border-emerald-400', 'text-white');
+
+      if (tabId === 'reports') {
+        populateReportYears();
+        renderReport();
+      }
+    }
+
+    // =========================================================================
+    // MODULE 1: BUYING & SMOKE YIELD LOGIC
+    // =========================================================================
+    function recalcBuyingForm(source) {
+      const qty = parseFloat(document.getElementById('buy-qty').value) || 0;
+      const price = parseFloat(document.getElementById('buy-price').value) || 0;
+      const totalAmount = qty * price;
+      document.getElementById('buy-total').value = totalAmount.toFixed(2);
+
+      const yieldPctEl = document.getElementById('buy-yield-pct');
+      const smokedQtyEl = document.getElementById('buy-smoked-qty');
+      const sellPrice = parseFloat(document.getElementById('buy-smoked-sell-price').value) || 0;
+
+      let smokedQty = 0;
+      let yieldPct = parseFloat(yieldPctEl.value) || 0;
+
+      if (source === 'smokedQty') {
+        smokedQty = parseFloat(smokedQtyEl.value) || 0;
+        yieldPct = qty > 0 ? (smokedQty / qty) * 100 : 0;
+        yieldPctEl.value = yieldPct.toFixed(1);
+      } else {
+        smokedQty = (qty * yieldPct) / 100;
+        smokedQtyEl.value = smokedQty > 0 ? smokedQty.toFixed(2) : '';
+      }
+
+      const effCostPerKg = smokedQty > 0 ? totalAmount / smokedQty : 0;
+      const estBatchValue = smokedQty * sellPrice;
+
+      document.getElementById('buy-eff-cost-display').textContent = `${formatINR(effCostPerKg)} / kg`;
+      document.getElementById('buy-est-value-display').textContent = formatINR(estBatchValue);
+    }
+
+    document.getElementById('buying-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const editId = document.getElementById('buy-edit-id').value;
+      const date = document.getElementById('buy-date').value;
+      const supplier = document.getElementById('buy-supplier').value.trim() || 'Local Supplier';
+      const qty = parseFloat(document.getElementById('buy-qty').value) || 0;
+      const pricePerKg = parseFloat(document.getElementById('buy-price').value) || 0;
+      const totalAmount = +(qty * pricePerKg).toFixed(2);
+      const paymentMode = document.getElementById('buy-payment').value;
+      const paidBy = document.getElementById('buy-paidby').value;
+      const yieldPct = parseFloat(document.getElementById('buy-yield-pct').value) || 0;
+      const smokedQty = parseFloat(document.getElementById('buy-smoked-qty').value) || +((qty * yieldPct) / 100).toFixed(2);
+      const targetSellPrice = parseFloat(document.getElementById('buy-smoked-sell-price').value) || 0;
+      const effectiveSmokedCost = smokedQty > 0 ? +(totalAmount / smokedQty).toFixed(2) : 0;
+
+      if (qty <= 0 || pricePerKg < 0) {
+        showToast('Please enter valid quantity and price.', 'error');
+        return;
+      }
+
+      const record = {
+        id: editId || 'buy_' + Date.now(),
+        date,
+        supplier,
+        qty,
+        pricePerKg,
+        totalAmount,
+        paymentMode,
+        paidBy,
+        yieldPct: +yieldPct.toFixed(1),
+        smokedQty: +smokedQty.toFixed(2),
+        targetSellPrice,
+        effectiveSmokedCost
+      };
+
+      await savePurchaseToCloud(record);
+      showToast(editId ? 'Purchase batch updated in cloud.' : 'Purchase batch recorded to cloud.');
+      resetBuyingForm();
+    });
+
+    function editBuyingRecord(id) {
+      const item = state.purchases.find(p => p.id === id);
+      if (!item) return;
+      document.getElementById('buy-edit-id').value = item.id;
+      document.getElementById('buy-date').value = item.date;
+      document.getElementById('buy-supplier').value = item.supplier;
+      document.getElementById('buy-qty').value = item.qty;
+      document.getElementById('buy-price').value = item.pricePerKg;
+      document.getElementById('buy-payment').value = item.paymentMode || 'Cash';
+      document.getElementById('buy-paidby').value = item.paidBy || 'Spice Jewel';
+      document.getElementById('buy-yield-pct').value = item.yieldPct;
+      document.getElementById('buy-smoked-qty').value = item.smokedQty;
+      document.getElementById('buy-smoked-sell-price').value = item.targetSellPrice || 550;
+
+      document.getElementById('buy-form-title').textContent = 'Edit Purchase & Smoke Batch';
+      document.getElementById('buy-submit-btn').textContent = 'Update Batch';
+      document.getElementById('buy-cancel-edit-btn').classList.remove('hidden');
+      recalcBuyingForm('pct');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetBuyingForm() {
+      document.getElementById('buying-form').reset();
+      document.getElementById('buy-edit-id').value = '';
+      document.getElementById('buy-date').value = getTodayISO();
+      document.getElementById('buy-supplier').value = 'Local Supplier';
+      document.getElementById('buy-yield-pct').value = '65';
+      document.getElementById('buy-smoked-sell-price').value = '550';
+      document.getElementById('buy-total').value = '0.00';
+      document.getElementById('buy-form-title').textContent = 'Record Pork Purchase & Smoke Batch';
+      document.getElementById('buy-submit-btn').textContent = 'Save Purchase & Smoke Batch';
+      document.getElementById('buy-cancel-edit-btn').classList.add('hidden');
+      recalcBuyingForm('pct');
+    }
+
+    function deleteBuyingRecord(id) {
+      openModal({
+        title: 'Delete Purchase Batch?',
+        message: 'This will remove the purchase entry from the Supabase cloud database.',
+        confirmText: 'Delete',
+        confirmClass: 'bg-rose-600 hover:bg-rose-700',
+        onConfirm: async () => {
+          await deletePurchaseFromCloud(id);
+          showToast('Purchase entry deleted from cloud.');
+        }
+      });
+    }
+
+    function renderBuyingTable() {
+      const search = (document.getElementById('buy-search').value || '').toLowerCase();
+      const payFilter = document.getElementById('buy-filter-pay').value;
+      const tbody = document.getElementById('buying-table-body');
+      const tfoot = document.getElementById('buying-table-foot');
+
+      const filtered = state.purchases
+        .filter(p => {
+          const matchesSearch = p.supplier.toLowerCase().includes(search) || p.date.includes(search);
+          const matchesPay = payFilter === 'ALL' || p.paymentMode === payFilter;
+          return matchesSearch && matchesPay;
+        })
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-xs text-slate-400">No pork purchase entries found. Add a batch on the left or load demo data.</td></tr>`;
+        tfoot.innerHTML = '';
+        return;
+      }
+
+      let sumRaw = 0, sumPaid = 0, sumSmoked = 0;
+      tbody.innerHTML = filtered.map(p => {
+        sumRaw += p.qty;
+        sumPaid += p.totalAmount;
+        sumSmoked += p.smokedQty;
+        const badgeClass = p.paymentMode === 'Cash'
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          : p.paymentMode === 'Online'
+          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+          : 'bg-rose-50 text-rose-700 border-rose-200';
+        return `
+          <tr class="hover:bg-slate-50/85 transition tabular-nums">
+            <td class="py-3 px-4">
+              <div class="font-semibold text-slate-900">${escapeHTML(p.date)}</div>
+              <div class="text-xs text-slate-500">${escapeHTML(p.supplier)}</div>
+            </td>
+            <td class="py-3 px-3 text-right font-semibold">${p.qty.toFixed(2)} kg</td>
+            <td class="py-3 px-3 text-right font-bold text-slate-900">${formatINR(p.totalAmount)}</td>
+            <td class="py-3 px-3">
+              <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold border ${badgeClass}">${escapeHTML(p.paymentMode)}</span>
+              <div class="text-[11px] text-slate-500 mt-0.5">By: ${escapeHTML(p.paidBy || 'Spice Jewel')}</div>
+            </td>
+            <td class="py-3 px-3 text-right">
+              <div class="font-bold text-amber-800">${p.smokedQty.toFixed(2)} kg</div>
+              <div class="text-[11px] text-slate-500">${p.yieldPct}% yield</div>
+            </td>
+            <td class="py-3 px-3 text-right font-semibold text-slate-700">${formatINR(p.effectiveSmokedCost)}</td>
+            <td class="py-3 px-4 text-right whitespace-nowrap">
+              <button onclick="editBuyingRecord('${p.id}')" class="text-xs font-semibold text-emerald-700 hover:underline mr-2 cursor-pointer">Edit</button>
+              <button onclick="deleteBuyingRecord('${p.id}')" class="text-xs font-semibold text-rose-600 hover:underline cursor-pointer">Del</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      const avgCost = sumSmoked > 0 ? sumPaid / sumSmoked : 0;
+      tfoot.innerHTML = `
+        <tr>
+          <td class="py-3 px-4">Totals (${filtered.length} batches)</td>
+          <td class="py-3 px-3 text-right">${sumRaw.toFixed(2)} kg</td>
+          <td class="py-3 px-3 text-right text-slate-900">${formatINR(sumPaid)}</td>
+          <td class="py-3 px-3"></td>
+          <td class="py-3 px-3 text-right text-amber-900">${sumSmoked.toFixed(2)} kg</td>
+          <td class="py-3 px-3 text-right">${formatINR(avgCost)}</td>
+          <td class="py-3 px-4"></td>
+        </tr>
+      `;
+    }
+
+    // =========================================================================
+    // MODULE 2: EXPENSES TRACKER LOGIC
+    // =========================================================================
+    document.getElementById('expenses-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const editId = document.getElementById('exp-edit-id').value;
+      const date = document.getElementById('exp-date').value;
+      const category = document.getElementById('exp-category').value;
+      const description = document.getElementById('exp-description').value.trim();
+      const amount = parseFloat(document.getElementById('exp-amount').value) || 0;
+      const paidBy = document.getElementById('exp-paidby').value;
+
+      if (!description || amount <= 0) {
+        showToast('Please enter description and valid expense amount.', 'error');
+        return;
+      }
+
+      const record = {
+        id: editId || 'exp_' + Date.now(),
+        date,
+        category,
+        description,
+        amount: +amount.toFixed(2),
+        paidBy
+      };
+
+      await saveExpenseToCloud(record);
+      showToast(editId ? 'Expense updated in cloud.' : 'Expense recorded to cloud.');
+      resetExpensesForm();
+    });
+
+    function editExpenseRecord(id) {
+      const item = state.expenses.find(x => x.id === id);
+      if (!item) return;
+      document.getElementById('exp-edit-id').value = item.id;
+      document.getElementById('exp-date').value = item.date;
+      document.getElementById('exp-category').value = item.category;
+      document.getElementById('exp-description').value = item.description;
+      document.getElementById('exp-amount').value = item.amount;
+      document.getElementById('exp-paidby').value = item.paidBy || 'Spice Jewel';
+
+      document.getElementById('exp-form-title').textContent = 'Edit Expense Entry';
+      document.getElementById('exp-submit-btn').textContent = 'Update Expense';
+      document.getElementById('exp-cancel-edit-btn').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetExpensesForm() {
+      document.getElementById('expenses-form').reset();
+      document.getElementById('exp-edit-id').value = '';
+      document.getElementById('exp-date').value = getTodayISO();
+      document.getElementById('exp-category').value = 'Wood';
+      document.getElementById('exp-paidby').value = 'Spice Jewel';
+      document.getElementById('exp-form-title').textContent = 'Record Operating / CapEx Expense';
+      document.getElementById('exp-submit-btn').textContent = 'Save Expense Entry';
+      document.getElementById('exp-cancel-edit-btn').classList.add('hidden');
+    }
+
+    function deleteExpenseRecord(id) {
+      openModal({
+        title: 'Delete Expense Entry?',
+        message: 'This will remove the expense from the Supabase cloud database.',
+        confirmText: 'Delete',
+        confirmClass: 'bg-rose-600 hover:bg-rose-700',
+        onConfirm: async () => {
+          await deleteExpenseFromCloud(id);
+          showToast('Expense entry deleted from cloud.');
+        }
+      });
+    }
+
+    function renderExpensesTable() {
+      const search = (document.getElementById('exp-search').value || '').toLowerCase();
+      const catFilter = document.getElementById('exp-filter-cat').value;
+      const tbody = document.getElementById('expenses-table-body');
+      const tfoot = document.getElementById('expenses-table-foot');
+      const catSummaryEl = document.getElementById('exp-cat-summary');
+      const payerSummaryEl = document.getElementById('exp-payer-summary');
+
+      const filtered = state.expenses
+        .filter(x => {
+          const matchesSearch = x.description.toLowerCase().includes(search) || x.date.includes(search) || x.paidBy.toLowerCase().includes(search);
+          const matchesCat = catFilter === 'ALL' || x.category === catFilter;
+          return matchesSearch && matchesCat;
+        })
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      const catTotals = { Wood: 0, Maintenance: 0, Others: 0, CapEx: 0 };
+      const payerTotals = { 'Spice Jewel': 0, 'Digu': 0, 'Chetan': 0, 'Koka': 0 };
+
+      state.expenses.forEach(x => {
+        if (catTotals[x.category] !== undefined) catTotals[x.category] += x.amount;
+        else catTotals[x.category] = x.amount;
+
+        if (payerTotals[x.paidBy] !== undefined) payerTotals[x.paidBy] += x.amount;
+        else payerTotals[x.paidBy] = x.amount;
+      });
+
+      catSummaryEl.innerHTML = Object.entries(catTotals).map(([cat, amt]) => `
+        <div class="flex justify-between items-center">
+          <span class="text-slate-600">${cat}:</span>
+          <strong class="text-slate-900">${formatINR(amt)}</strong>
+        </div>
+      `).join('');
+
+      payerSummaryEl.innerHTML = Object.entries(payerTotals).map(([payer, amt]) => `
+        <div class="flex justify-between items-center">
+          <span class="text-slate-600">${payer}:</span>
+          <strong class="text-slate-900">${formatINR(amt)}</strong>
+        </div>
+      `).join('');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-xs text-slate-400">No expense entries found.</td></tr>`;
+        tfoot.innerHTML = '';
+        return;
+      }
+
+      let sumAmount = 0;
+      tbody.innerHTML = filtered.map(x => {
+        sumAmount += x.amount;
+        const catBadge = x.category === 'Wood' ? 'bg-amber-50 text-amber-800 border-amber-200'
+          : x.category === 'CapEx' ? 'bg-purple-50 text-purple-800 border-purple-200'
+          : x.category === 'Maintenance' ? 'bg-blue-50 text-blue-800 border-blue-200'
+          : 'bg-slate-100 text-slate-700';
+
+        return `
+          <tr class="hover:bg-slate-50/85 transition tabular-nums">
+            <td class="py-3 px-4">
+              <div class="font-semibold text-slate-900">${escapeHTML(x.date)}</div>
+              <span class="inline-block mt-0.5 px-2 py-0.2 text-[10px] font-semibold rounded border ${catBadge}">${escapeHTML(x.category)}</span>
+            </td>
+            <td class="py-3 px-3 text-slate-800 font-medium">${escapeHTML(x.description)}</td>
+            <td class="py-3 px-3 text-slate-600">${escapeHTML(x.paidBy)}</td>
+            <td class="py-3 px-3 text-right font-bold text-rose-700">${formatINR(x.amount)}</td>
+            <td class="py-3 px-4 text-right whitespace-nowrap">
+              <button onclick="editExpenseRecord('${x.id}')" class="text-xs font-semibold text-emerald-700 hover:underline mr-2 cursor-pointer">Edit</button>
+              <button onclick="deleteExpenseRecord('${x.id}')" class="text-xs font-semibold text-rose-600 hover:underline cursor-pointer">Del</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tfoot.innerHTML = `
+        <tr>
+          <td colspan="3" class="py-3 px-4">Total Expenses (${filtered.length} items)</td>
+          <td class="py-3 px-3 text-right text-rose-700">${formatINR(sumAmount)}</td>
+          <td class="py-3 px-4"></td>
+        </tr>
+      `;
+    }
+
+    // =========================================================================
+    // MODULE 3: RESTAURANT ITEM-WISE SALES LOGIC
+    // =========================================================================
+    function setDishPreset(dishName, porkType) {
+      document.getElementById('rest-dish').value = dishName;
+      document.getElementById('rest-pork-type').value = porkType;
+      document.getElementById('rest-pork-qty').focus();
+    }
+
+    document.getElementById('restaurant-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const date = document.getElementById('rest-date').value;
+      const dishName = document.getElementById('rest-dish').value.trim();
+      const porkType = document.getElementById('rest-pork-type').value;
+      const porkQty = parseFloat(document.getElementById('rest-pork-qty').value) || 0;
+      const portions = parseInt(document.getElementById('rest-portions').value, 10) || 0;
+      const saleAmount = parseFloat(document.getElementById('rest-amount').value) || 0;
+      const paymentMode = document.getElementById('rest-payment').value;
+
+      if (!dishName || porkQty <= 0) {
+        showToast('Please enter dish name and pork quantity used.', 'error');
+        return;
+      }
+
+      const record = {
+        id: 'rest_' + Date.now(),
+        date,
+        dishName,
+        porkType,
+        porkQty: +porkQty.toFixed(2),
+        portions,
+        saleAmount: +saleAmount.toFixed(2),
+        paymentMode
+      };
+
+      await saveRestaurantToCloud(record);
+      document.getElementById('restaurant-form').reset();
+      document.getElementById('rest-date').value = date;
+      showToast('Restaurant dish sale recorded to cloud.');
+    });
+
+    function deleteRestaurantSale(id) {
+      openModal({
+        title: 'Delete Restaurant Sale?',
+        message: 'Remove this restaurant item sale entry from Supabase cloud?',
+        confirmText: 'Delete',
+        confirmClass: 'bg-rose-600 hover:bg-rose-700',
+        onConfirm: async () => {
+          await deleteRestaurantFromCloud(id);
+          showToast('Restaurant entry deleted.');
+        }
+      });
+    }
+
+    function renderRestaurantTables() {
+      const search = (document.getElementById('rest-search').value || '').toLowerCase();
+      const summaryBody = document.getElementById('rest-summary-body');
+      const logBody = document.getElementById('rest-log-body');
+
+      const dishMap = {};
+      state.restaurantSales.forEach(r => {
+        if (!dishMap[r.dishName]) {
+          dishMap[r.dishName] = { dishName: r.dishName, portions: 0, porkQty: 0, revenue: 0 };
+        }
+        dishMap[r.dishName].portions += (r.portions || 0);
+        dishMap[r.dishName].porkQty += r.porkQty;
+        dishMap[r.dishName].revenue += r.saleAmount;
+      });
+
+      const dishList = Object.values(dishMap).sort((a, b) => b.revenue - a.revenue);
+      if (dishList.length === 0) {
+        summaryBody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-xs text-slate-400">No restaurant dish sales recorded yet.</td></tr>`;
+      } else {
+        summaryBody.innerHTML = dishList.map(d => {
+          const revPerKg = d.porkQty > 0 ? d.revenue / d.porkQty : 0;
+          return `
+            <tr class="hover:bg-slate-50/85 tabular-nums">
+              <td class="py-2.5 px-4 font-semibold text-slate-900">${escapeHTML(d.dishName)}</td>
+              <td class="py-2.5 px-3 text-right text-slate-600">${d.portions > 0 ? d.portions : '—'}</td>
+              <td class="py-2.5 px-3 text-right font-semibold text-amber-800">${d.porkQty.toFixed(2)} kg</td>
+              <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${formatINR(d.revenue)}</td>
+              <td class="py-2.5 px-4 text-right text-xs font-semibold text-slate-600">${formatINR(revPerKg)}/kg</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      const filtered = state.restaurantSales
+        .filter(r => r.dishName.toLowerCase().includes(search) || r.date.includes(search))
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      if (filtered.length === 0) {
+        logBody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-xs text-slate-400">No matching restaurant sales entries.</td></tr>`;
+        return;
+      }
+
+      logBody.innerHTML = filtered.map(r => `
+        <tr class="hover:bg-slate-50/85 tabular-nums">
+          <td class="py-2.5 px-4 font-medium text-slate-700">${escapeHTML(r.date)}</td>
+          <td class="py-2.5 px-3">
+            <div class="font-semibold text-slate-900">${escapeHTML(r.dishName)}</div>
+            ${r.portions ? `<div class="text-[11px] text-slate-500">${r.portions} plates</div>` : ''}
+          </td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold ${r.porkType === 'Smoked Pork' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-700'}">${escapeHTML(r.porkType)}</span>
+          </td>
+          <td class="py-2.5 px-3 text-right font-semibold">${r.porkQty.toFixed(2)} kg</td>
+          <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${formatINR(r.saleAmount)}</td>
+          <td class="py-2.5 px-3 text-xs font-medium text-slate-600">${escapeHTML(r.paymentMode)}</td>
+          <td class="py-2.5 px-4 text-right">
+            <button onclick="deleteRestaurantSale('${r.id}')" class="text-xs font-semibold text-rose-600 hover:underline cursor-pointer">Del</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // =========================================================================
+    // MODULE 4: WHOLESALE & CREDIT LEDGER LOGIC
+    // =========================================================================
+    function recalcWholesaleForm() {
+      const qty = parseFloat(document.getElementById('ws-qty').value) || 0;
+      const price = parseFloat(document.getElementById('ws-price').value) || 0;
+      const total = +(qty * price).toFixed(2);
+      document.getElementById('ws-total').value = total.toFixed(2);
+
+      const received = parseFloat(document.getElementById('ws-received').value) || 0;
+      const credit = Math.max(0, +(total - received).toFixed(2));
+      document.getElementById('ws-credit').value = credit.toFixed(2);
+
+      const statusEl = document.getElementById('ws-status-preview');
+      if (total === 0) {
+        statusEl.textContent = 'Status: Pending';
+        statusEl.className = 'mt-1 inline-block text-[11px] font-semibold text-slate-500';
+      } else if (credit <= 0) {
+        statusEl.textContent = 'Status: Fully Paid';
+        statusEl.className = 'mt-1 inline-block text-[11px] font-bold text-emerald-700';
+      } else if (received > 0) {
+        statusEl.textContent = 'Status: Partial Credit';
+        statusEl.className = 'mt-1 inline-block text-[11px] font-bold text-amber-700';
+      } else {
+        statusEl.textContent = 'Status: Full Credit Due';
+        statusEl.className = 'mt-1 inline-block text-[11px] font-bold text-rose-700';
+      }
+    }
+
+    function markWholesaleFullPaid() {
+      const total = parseFloat(document.getElementById('ws-total').value) || 0;
+      document.getElementById('ws-received').value = total.toFixed(2);
+      recalcWholesaleForm();
+    }
+
+    document.getElementById('wholesale-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const date = document.getElementById('ws-date').value;
+      const porkType = document.getElementById('ws-pork-type').value;
+      const customerName = document.getElementById('ws-name').value.trim();
+      const contact = document.getElementById('ws-contact').value.trim();
+      const qty = parseFloat(document.getElementById('ws-qty').value) || 0;
+      const pricePerKg = parseFloat(document.getElementById('ws-price').value) || 0;
+      const totalAmount = +(qty * pricePerKg).toFixed(2);
+      const receivedAmount = parseFloat(document.getElementById('ws-received').value) || 0;
+      const creditAmount = Math.max(0, +(totalAmount - receivedAmount).toFixed(2));
+      const note = document.getElementById('ws-note').value.trim();
+
+      if (!customerName || qty <= 0) {
+        showToast('Please enter customer name and valid quantity.', 'error');
+        return;
+      }
+
+      const record = {
+        id: 'ws_' + Date.now(),
+        date,
+        customerName,
+        contact,
+        porkType,
+        qty: +qty.toFixed(2),
+        pricePerKg: +pricePerKg.toFixed(2),
+        totalAmount,
+        receivedAmount: +receivedAmount.toFixed(2),
+        creditAmount,
+        note
+      };
+
+      await saveWholesaleToCloud(record);
+      document.getElementById('wholesale-form').reset();
+      document.getElementById('ws-date').value = date;
+      document.getElementById('ws-received').value = '0';
+      recalcWholesaleForm();
+      showToast('Customer sale recorded to cloud.');
+    });
+
+    function settleCustomerCredit(id) {
+      const entry = state.wholesaleSales.find(w => w.id === id);
+      if (!entry || entry.creditAmount <= 0) return;
+
+      openModal({
+        title: `Receive Payment — ${entry.customerName}`,
+        message: `Total Bill: ${formatINR(entry.totalAmount)} | Already Received: ${formatINR(entry.receivedAmount)} | Pending Due: ${formatINR(entry.creditAmount)}`,
+        showInput: true,
+        inputLabel: 'Additional Amount Received Now (₹)',
+        inputDefault: entry.creditAmount.toFixed(2),
+        inputHint: 'Enter full due amount to settle completely, or partial payment.',
+        confirmText: 'Record Payment',
+        onConfirm: async (addAmount) => {
+          if (isNaN(addAmount) || addAmount <= 0) {
+            showToast('Invalid payment amount entered.', 'error');
+            return;
+          }
+          const updated = {
+            ...entry,
+            receivedAmount: +(entry.receivedAmount + addAmount).toFixed(2),
+            creditAmount: Math.max(0, +(entry.totalAmount - (entry.receivedAmount + addAmount)).toFixed(2))
+          };
+          await saveWholesaleToCloud(updated);
+          showToast(`Payment of ${formatINR(addAmount)} recorded to cloud.`);
+        }
+      });
+    }
+
+    function deleteWholesaleSale(id) {
+      openModal({
+        title: 'Delete Customer Sale?',
+        message: 'Remove this customer sale record from Supabase cloud?',
+        confirmText: 'Delete',
+        confirmClass: 'bg-rose-600 hover:bg-rose-700',
+        onConfirm: async () => {
+          await deleteWholesaleFromCloud(id);
+          showToast('Customer record deleted.');
+        }
+      });
+    }
+
+    function renderWholesaleTable() {
+      const search = (document.getElementById('ws-search').value || '').toLowerCase();
+      const statusFilter = document.getElementById('ws-filter-status').value;
+      const tbody = document.getElementById('wholesale-table-body');
+      const tfoot = document.getElementById('wholesale-table-foot');
+
+      const filtered = state.wholesaleSales
+        .filter(w => {
+          const matchesSearch = w.customerName.toLowerCase().includes(search)
+            || w.contact.toLowerCase().includes(search)
+            || (w.note || '').toLowerCase().includes(search)
+            || w.date.includes(search);
+          const matchesStatus = statusFilter === 'ALL'
+            || (statusFilter === 'DUE' && w.creditAmount > 0)
+            || (statusFilter === 'PAID' && w.creditAmount <= 0);
+          return matchesSearch && matchesStatus;
+        })
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-xs text-slate-400">No customer sales records match your filter.</td></tr>`;
+        tfoot.innerHTML = '';
+        return;
+      }
+
+      let sumQty = 0, sumTotal = 0, sumRec = 0, sumCredit = 0;
+      tbody.innerHTML = filtered.map(w => {
+        sumQty += w.qty;
+        sumTotal += w.totalAmount;
+        sumRec += w.receivedAmount;
+        sumCredit += w.creditAmount;
+
+        let statusBadge = '';
+        if (w.creditAmount <= 0) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">PAID</span>`;
+        } else if (w.receivedAmount > 0) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">PARTIAL</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">UNPAID</span>`;
+        }
+
+        return `
+          <tr class="hover:bg-slate-50/85 tabular-nums">
+            <td class="py-3 px-4">
+              <div class="font-bold text-slate-900">${escapeHTML(w.customerName)}</div>
+              <div class="text-xs text-slate-500">${escapeHTML(w.contact)} • ${escapeHTML(w.date)}</div>
+            </td>
+            <td class="py-3 px-3">
+              <div class="font-semibold text-slate-800">${w.qty.toFixed(2)} kg</div>
+              <div class="text-[11px] text-slate-500">${escapeHTML(w.porkType)} @ ${formatINR(w.pricePerKg)}</div>
+            </td>
+            <td class="py-3 px-3 text-right font-bold text-slate-900">${formatINR(w.totalAmount)}</td>
+            <td class="py-3 px-3 text-right font-semibold text-emerald-700">${formatINR(w.receivedAmount)}</td>
+            <td class="py-3 px-3 text-right font-extrabold ${w.creditAmount > 0 ? 'text-rose-600' : 'text-slate-400'}">${formatINR(w.creditAmount)}</td>
+            <td class="py-3 px-3">
+              ${statusBadge}
+              ${w.note ? `<div class="text-[11px] text-slate-500 mt-1 max-w-[140px] truncate" title="${escapeHTML(w.note)}">${escapeHTML(w.note)}</div>` : ''}
+            </td>
+            <td class="py-3 px-4 text-right whitespace-nowrap">
+              ${w.creditAmount > 0 ? `<button onclick="settleCustomerCredit('${w.id}')" class="text-xs font-bold text-blue-700 hover:underline mr-2 cursor-pointer">Settle</button>` : ''}
+              <button onclick="deleteWholesaleSale('${w.id}')" class="text-xs font-semibold text-rose-600 hover:underline cursor-pointer">Del</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tfoot.innerHTML = `
+        <tr>
+          <td class="py-3 px-4">Totals (${filtered.length} orders)</td>
+          <td class="py-3 px-3">${sumQty.toFixed(2)} kg</td>
+          <td class="py-3 px-3 text-right">${formatINR(sumTotal)}</td>
+          <td class="py-3 px-3 text-right text-emerald-700">${formatINR(sumRec)}</td>
+          <td class="py-3 px-3 text-right text-rose-600">${formatINR(sumCredit)}</td>
+          <td colspan="2" class="py-3 px-4"></td>
+        </tr>
+      `;
+    }
+
+    // =========================================================================
+    // DASHBOARD KPI UPDATE
+    // =========================================================================
+    function updateDashboardKPIs() {
+      const totalBoughtKg = state.purchases.reduce((s, p) => s + p.qty, 0);
+      const totalBoughtINR = state.purchases.reduce((s, p) => s + p.totalAmount, 0);
+      const totalSmokedKg = state.purchases.reduce((s, p) => s + p.smokedQty, 0);
+      const avgYieldPct = totalBoughtKg > 0 ? (totalSmokedKg / totalBoughtKg) * 100 : 0;
+      const avgSmokedCost = totalSmokedKg > 0 ? totalBoughtINR / totalSmokedKg : 0;
+
+      const totalExpenses = state.expenses.reduce((s, x) => s + x.amount, 0);
+
+      const restRev = state.restaurantSales.reduce((s, r) => s + r.saleAmount, 0);
+      const restKg = state.restaurantSales.reduce((s, r) => s + r.porkQty, 0);
+      const restSmokedUsed = state.restaurantSales.filter(r => r.porkType === 'Smoked Pork').reduce((s, r) => s + r.porkQty, 0);
+
+      const otherRev = state.wholesaleSales.reduce((s, w) => s + w.totalAmount, 0);
+      const otherRec = state.wholesaleSales.reduce((s, w) => s + w.receivedAmount, 0);
+      const otherDue = state.wholesaleSales.reduce((s, w) => s + w.creditAmount, 0);
+      const otherKg = state.wholesaleSales.reduce((s, w) => s + w.qty, 0);
+      const otherSmokedSold = state.wholesaleSales.filter(w => w.porkType === 'Smoked Pork').reduce((s, w) => s + w.qty, 0);
+
+      const totalGrossRev = restRev + otherRev;
+      const netPnL = totalGrossRev - (totalBoughtINR + totalExpenses);
+      const smokedBalance = Math.max(0, totalSmokedKg - (restSmokedUsed + otherSmokedSold));
+
+      document.getElementById('kpi-bought-kg').textContent = formatKg(totalBoughtKg);
+      document.getElementById('kpi-bought-inr').textContent = `Spend: ${formatINR(totalBoughtINR)}`;
+
+      document.getElementById('kpi-smoked-kg').textContent = formatKg(totalSmokedKg);
+      document.getElementById('kpi-avg-yield').textContent = `${avgYieldPct.toFixed(1)}%`;
+      document.getElementById('kpi-smoked-cost').textContent = `Avg Cost: ${formatINR(avgSmokedCost)}/kg`;
+
+      document.getElementById('kpi-expenses-total').textContent = formatINR(totalExpenses);
+      const woodExp = state.expenses.filter(x => x.category === 'Wood').reduce((s, x) => s + x.amount, 0);
+      document.getElementById('kpi-expenses-breakdown').textContent = `Wood: ${formatINR(woodExp)} | Maint & CapEx`;
+
+      document.getElementById('kpi-rest-rev').textContent = formatINR(restRev);
+      document.getElementById('kpi-rest-kg').textContent = `Pork Used: ${formatKg(restKg)}`;
+
+      document.getElementById('kpi-other-rev').textContent = formatINR(otherRev);
+      document.getElementById('kpi-other-rec').textContent = `Rec: ${formatINR(otherRec)}`;
+      document.getElementById('kpi-other-due').textContent = `Due: ${formatINR(otherDue)}`;
+
+      const pnlEl = document.getElementById('kpi-net-pnl');
+      const pnlBadge = document.getElementById('kpi-pnl-badge');
+      pnlEl.textContent = formatINR(netPnL);
+      if (netPnL >= 0) {
+        pnlEl.className = 'mt-2 text-xl font-extrabold text-emerald-400 tabular-nums';
+        pnlBadge.textContent = 'PROFIT';
+        pnlBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300';
+      } else {
+        pnlEl.className = 'mt-2 text-xl font-extrabold text-rose-400 tabular-nums';
+        pnlBadge.textContent = 'LOSS';
+        pnlBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300';
+      }
+
+      document.getElementById('kpi-stock-smoked').textContent = `${smokedBalance.toFixed(1)} kg`;
+      document.getElementById('kpi-total-dispatched').textContent = `${(restKg + otherKg).toFixed(1)} kg`;
+    }
+
+    // =========================================================================
+    // MODULE 5: REPORTS & P&L STATEMENT
+    // =========================================================================
+    function populateReportYears() {
+      const yearSelect = document.getElementById('rep-year-input');
+      const years = new Set([getCurrentYear()]);
+      state.purchases.forEach(p => years.add(p.date.slice(0, 4)));
+      state.expenses.forEach(x => years.add(x.date.slice(0, 4)));
+      state.restaurantSales.forEach(r => years.add(r.date.slice(0, 4)));
+      state.wholesaleSales.forEach(w => years.add(w.date.slice(0, 4)));
+
+      const sortedYears = Array.from(years).sort((a, b) => b.localeCompare(a));
+      const currentVal = yearSelect.value || getCurrentYear();
+      yearSelect.innerHTML = sortedYears.map(y => `<option value="${y}" ${y === currentVal ? 'selected' : ''}>${y}</option>`).join('');
+    }
+
+    function setReportPeriodType(type) {
+      state.reportPeriodType = type;
+      document.querySelectorAll('.rep-type-btn').forEach(btn => {
+        btn.classList.remove('bg-white', 'text-slate-900', 'shadow-xs');
+        btn.classList.add('text-slate-600');
+      });
+      const activeBtn = document.getElementById(`rep-type-${type}`);
+      activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-xs');
+      activeBtn.classList.remove('text-slate-600');
+
+      document.getElementById('rep-picker-daily').classList.toggle('hidden', type !== 'daily');
+      document.getElementById('rep-picker-monthly').classList.toggle('hidden', type !== 'monthly');
+      document.getElementById('rep-picker-annual').classList.toggle('hidden', type !== 'annual');
+
+      renderReport();
+    }
+
+    function getFilteredReportData() {
+      const type = state.reportPeriodType;
+      let prefix = '';
+      let label = 'All Time';
+      let title = 'All-Time Profit & Loss Statement';
+
+      if (type === 'daily') {
+        prefix = document.getElementById('rep-date-input').value || getTodayISO();
+        label = `Date: ${prefix}`;
+        title = 'Daily Profit & Loss Statement';
+      } else if (type === 'monthly') {
+        prefix = document.getElementById('rep-month-input').value || getCurrentMonthISO();
+        label = `Month: ${prefix}`;
+        title = 'Monthly Profit & Loss Statement';
+      } else if (type === 'annual') {
+        prefix = document.getElementById('rep-year-input').value || getCurrentYear();
+        label = `Year: ${prefix}`;
+        title = 'Annual Profit & Loss Statement';
+      }
+
+      const matchFn = (item) => type === 'all' ? true : item.date.startsWith(prefix);
+
+      const purchases = state.purchases.filter(matchFn).sort((a, b) => a.date.localeCompare(b.date));
+      const expenses = state.expenses.filter(matchFn).sort((a, b) => a.date.localeCompare(b.date));
+      const restaurant = state.restaurantSales.filter(matchFn).sort((a, b) => a.date.localeCompare(b.date));
+      const wholesale = state.wholesaleSales.filter(matchFn).sort((a, b) => a.date.localeCompare(b.date));
+
+      const totalBuyCost = purchases.reduce((s, p) => s + p.totalAmount, 0);
+      const totalRawKg = purchases.reduce((s, p) => s + p.qty, 0);
+      const totalSmokedKg = purchases.reduce((s, p) => s + p.smokedQty, 0);
+
+      const totalExpenses = expenses.reduce((s, x) => s + x.amount, 0);
+      const expCat = { Wood: 0, Maintenance: 0, Others: 0, CapEx: 0 };
+      const expPayer = { 'Spice Jewel': 0, 'Digu': 0, 'Chetan': 0, 'Koka': 0 };
+      expenses.forEach(x => {
+        if (expCat[x.category] !== undefined) expCat[x.category] += x.amount;
+        else expCat[x.category] = x.amount;
+        if (expPayer[x.paidBy] !== undefined) expPayer[x.paidBy] += x.amount;
+        else expPayer[x.paidBy] = x.amount;
+      });
+
+      const restRev = restaurant.reduce((s, r) => s + r.saleAmount, 0);
+      const restKg = restaurant.reduce((s, r) => s + r.porkQty, 0);
+
+      const otherRev = wholesale.reduce((s, w) => s + w.totalAmount, 0);
+      const otherRec = wholesale.reduce((s, w) => s + w.receivedAmount, 0);
+      const otherCredit = wholesale.reduce((s, w) => s + w.creditAmount, 0);
+      const otherKg = wholesale.reduce((s, w) => s + w.qty, 0);
+
+      const totalGrossRev = restRev + otherRev;
+      const totalCashCollected = restRev + otherRec;
+      const totalOutflows = totalBuyCost + totalExpenses;
+      const netProfit = totalGrossRev - totalOutflows;
+      const marginPct = totalGrossRev > 0 ? (netProfit / totalGrossRev) * 100 : 0;
+
+      return {
+        type, prefix, label, title,
+        purchases, expenses, restaurant, wholesale,
+        metrics: {
+          totalBuyCost, totalRawKg, totalSmokedKg,
+          totalExpenses, expCat, expPayer,
+          restRev, restKg,
+          otherRev, otherRec, otherCredit, otherKg,
+          totalGrossRev, totalCashCollected, totalOutflows, netProfit, marginPct
+        }
+      };
+    }
+
+    function renderReport() {
+      const data = getFilteredReportData();
+      const m = data.metrics;
+
+      document.getElementById('report-heading').textContent = data.title;
+      document.getElementById('report-period-badge').textContent = data.label;
+
+      document.getElementById('pnl-rest-rev').textContent = formatINR(m.restRev);
+      document.getElementById('pnl-other-rev').textContent = formatINR(m.otherRev);
+      document.getElementById('pnl-total-rev').textContent = formatINR(m.totalGrossRev);
+      document.getElementById('pnl-cash-collected').textContent = formatINR(m.totalCashCollected);
+      document.getElementById('pnl-pending-credit').textContent = formatINR(m.otherCredit);
+
+      document.getElementById('pnl-total-cost').textContent = formatINR(m.totalBuyCost);
+      document.getElementById('pnl-total-exp').textContent = formatINR(m.totalExpenses);
+      document.getElementById('pnl-total-outflows').textContent = formatINR(m.totalOutflows);
+      document.getElementById('pnl-raw-kg').textContent = formatKg(m.totalRawKg);
+      document.getElementById('pnl-smoked-kg').textContent = formatKg(m.totalSmokedKg);
+
+      const netEl = document.getElementById('pnl-net-profit');
+      const marginBadge = document.getElementById('pnl-margin-badge');
+      netEl.textContent = formatINR(m.netProfit);
+      netEl.className = `text-3xl font-extrabold tabular-nums mt-0.5 ${m.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+      marginBadge.textContent = `Margin: ${m.marginPct.toFixed(1)}%`;
+      marginBadge.className = `text-xs font-bold px-2 py-0.5 rounded-md tabular-nums ${m.netProfit >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`;
+
+      document.getElementById('pnl-rest-kg').textContent = formatKg(m.restKg);
+      document.getElementById('pnl-other-kg').textContent = formatKg(m.otherKg);
+
+      document.getElementById('rep-exp-cat-list').innerHTML = Object.entries(m.expCat).map(([cat, amt]) => `
+        <div class="flex justify-between"><span>${cat}:</span><strong class="text-slate-900">${formatINR(amt)}</strong></div>
+      `).join('');
+
+      document.getElementById('rep-exp-payer-list').innerHTML = Object.entries(m.expPayer).map(([payer, amt]) => `
+        <div class="flex justify-between"><span>${payer}:</span><strong class="text-slate-900">${formatINR(amt)}</strong></div>
+      `).join('');
+
+      document.getElementById('rep-buy-body').innerHTML = data.purchases.length === 0
+        ? `<tr><td colspan="7" class="py-4 text-center text-slate-400">No purchase records in this period.</td></tr>`
+        : data.purchases.map(p => `
+            <tr>
+              <td class="py-2 px-3">${escapeHTML(p.date)}</td>
+              <td class="py-2 px-3 font-medium">${escapeHTML(p.supplier)}</td>
+              <td class="py-2 px-3 text-right">${p.qty.toFixed(2)}</td>
+              <td class="py-2 px-3 text-right font-bold">${formatINR(p.totalAmount)}</td>
+              <td class="py-2 px-3">${escapeHTML(p.paymentMode)} (${escapeHTML(p.paidBy)})</td>
+              <td class="py-2 px-3 text-right font-semibold text-amber-800">${p.smokedQty.toFixed(2)}</td>
+              <td class="py-2 px-3 text-right">${formatINR(p.effectiveSmokedCost)}</td>
+            </tr>
+          `).join('');
+
+      document.getElementById('rep-exp-body').innerHTML = data.expenses.length === 0
+        ? `<tr><td colspan="5" class="py-4 text-center text-slate-400">No expenses in this period.</td></tr>`
+        : data.expenses.map(x => `
+            <tr>
+              <td class="py-2 px-3">${escapeHTML(x.date)}</td>
+              <td class="py-2 px-3 font-medium">${escapeHTML(x.category)}</td>
+              <td class="py-2 px-3">${escapeHTML(x.description)}</td>
+              <td class="py-2 px-3">${escapeHTML(x.paidBy)}</td>
+              <td class="py-2 px-3 text-right font-bold text-rose-700">${formatINR(x.amount)}</td>
+            </tr>
+          `).join('');
+
+      document.getElementById('rep-rest-body').innerHTML = data.restaurant.length === 0
+        ? `<tr><td colspan="7" class="py-4 text-center text-slate-400">No restaurant dish sales in this period.</td></tr>`
+        : data.restaurant.map(r => `
+            <tr>
+              <td class="py-2 px-3">${escapeHTML(r.date)}</td>
+              <td class="py-2 px-3 font-medium">${escapeHTML(r.dishName)}</td>
+              <td class="py-2 px-3">${escapeHTML(r.porkType)}</td>
+              <td class="py-2 px-3 text-right font-semibold">${r.porkQty.toFixed(2)}</td>
+              <td class="py-2 px-3 text-right">${r.portions || '—'}</td>
+              <td class="py-2 px-3 text-right font-bold text-emerald-700">${formatINR(r.saleAmount)}</td>
+              <td class="py-2 px-3">${escapeHTML(r.paymentMode)}</td>
+            </tr>
+          `).join('');
+
+      document.getElementById('rep-ws-body').innerHTML = data.wholesale.length === 0
+        ? `<tr><td colspan="9" class="py-4 text-center text-slate-400">No wholesale sales in this period.</td></tr>`
+        : data.wholesale.map(w => `
+            <tr>
+              <td class="py-2 px-3">${escapeHTML(w.date)}</td>
+              <td class="py-2 px-3 font-bold">${escapeHTML(w.customerName)}</td>
+              <td class="py-2 px-3">${escapeHTML(w.contact)}</td>
+              <td class="py-2 px-3">${escapeHTML(w.porkType)}</td>
+              <td class="py-2 px-3 text-right">${w.qty.toFixed(2)}</td>
+              <td class="py-2 px-3 text-right font-bold">${formatINR(w.totalAmount)}</td>
+              <td class="py-2 px-3 text-right text-emerald-700">${formatINR(w.receivedAmount)}</td>
+              <td class="py-2 px-3 text-right font-bold text-rose-600">${formatINR(w.creditAmount)}</td>
+              <td class="py-2 px-3">${escapeHTML(w.note || '—')}</td>
+            </tr>
+          `).join('');
+    }
+
+    function exportReportToCSV() {
+      const data = getFilteredReportData();
+      const m = data.metrics;
+      const rows = [];
+
+      const escCSV = (val) => {
+        const s = String(val ?? '');
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+
+      rows.push([`PORKOPS FINANCIAL, EXPENSE & INVENTORY REPORT - ${data.title.toUpperCase()}`]);
+      rows.push([data.label, `Generated On: ${getTodayISO()}`]);
+      rows.push([]);
+      rows.push(['PROFIT & LOSS (P&L) STATEMENT', 'AMOUNT (INR) / QTY']);
+      rows.push(['Restaurant Item Sales Revenue (INR)', m.restRev.toFixed(2)]);
+      rows.push(['Wholesale / Other Sales Revenue (INR)', m.otherRev.toFixed(2)]);
+      rows.push(['TOTAL GROSS REVENUE (INR)', m.totalGrossRev.toFixed(2)]);
+      rows.push(['Cash / Online Collected (INR)', m.totalCashCollected.toFixed(2)]);
+      rows.push(['Pending Customer Credit Due (INR)', m.otherCredit.toFixed(2)]);
+      rows.push(['Total Pork Purchase Cost (INR)', m.totalBuyCost.toFixed(2)]);
+      rows.push(['Total Operating Expenses (INR)', m.totalExpenses.toFixed(2)]);
+      rows.push(['TOTAL OUTFLOWS (Cost + Expenses) (INR)', m.totalOutflows.toFixed(2)]);
+      rows.push(['NET PROFIT / LOSS (INR)', m.netProfit.toFixed(2)]);
+      rows.push(['PROFIT MARGIN (%)', m.marginPct.toFixed(2) + '%']);
+      rows.push(['Total Raw Pork Purchased (kg)', m.totalRawKg.toFixed(2)]);
+      rows.push(['Total Smoked Yield Produced (kg)', m.totalSmokedKg.toFixed(2)]);
+      rows.push([]);
+
+      rows.push(['1. PORK BUYING & SMOKE YIELD DETAILS']);
+      rows.push(['Date', 'Supplier', 'Raw Qty (kg)', 'Total Amount (INR)', 'Payment Mode', 'Paid By', 'Smoked Qty (kg)', 'Eff Cost/kg (INR)']);
+      data.purchases.forEach(p => {
+        rows.push([p.date, p.supplier, p.qty.toFixed(2), p.totalAmount.toFixed(2), p.paymentMode, p.paidBy, p.smokedQty.toFixed(2), p.effectiveSmokedCost.toFixed(2)]);
+      });
+
+      const csvContent = rows.map(r => r.map(escCSV).join(',')).join('\n');
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const filename = `PorkOps_Supabase_${data.type.toUpperCase()}_Report_${data.prefix || 'ALL'}.csv`;
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast(`Exported ${filename}`);
+    }
+
+    // Demo Data Generator for Supabase Cloud
+    async function loadDemoData() {
+      openModal({
+        title: 'Load Demo Data to Supabase Cloud?',
+        message: `This will seed your Supabase project (${SUPABASE_PROJECT_ID}) with sample procurement, smoke batches, expenses, and buyer orders.`,
+        confirmText: 'Seed Cloud Data',
+        onConfirm: async () => {
+          showToast('Uploading demo records to Supabase...');
+          const today = getTodayISO();
+          const monthPrefix = today.slice(0, 7);
+          const day1 = `${monthPrefix}-02`;
+          const day2 = `${monthPrefix}-08`;
+
+          const demoPurchases = [
+            { id: 'buy_demo_1', date: today, supplier: 'Sonapur Pig Farm', qty: 40.00, pricePerKg: 280.00, totalAmount: 11200.00, paymentMode: 'Online', paidBy: 'Spice Jewel', yieldPct: 65.0, smokedQty: 26.00, targetSellPrice: 560, effectiveSmokedCost: 430.77 },
+            { id: 'buy_demo_2', date: day2, supplier: 'Beltola Weekly Market', qty: 25.00, pricePerKg: 270.00, totalAmount: 6750.00, paymentMode: 'Cash', paidBy: 'Digu', yieldPct: 64.0, smokedQty: 16.00, targetSellPrice: 550, effectiveSmokedCost: 421.88 }
+          ];
+          const demoExpenses = [
+            { id: 'exp_demo_1', date: today, category: 'Wood', description: 'Oak & hardwood bundles (5 bags for smokehouse)', amount: 2500.00, paidBy: 'Chetan' },
+            { id: 'exp_demo_2', date: day1, category: 'Maintenance', description: 'Smokeroom chimney cleaning & mesh repair', amount: 1200.00, paidBy: 'Koka' },
+            { id: 'exp_demo_3', date: day2, category: 'CapEx', description: 'Commercial stainless steel meat slicing machine', amount: 14500.00, paidBy: 'Spice Jewel' }
+          ];
+          const demoRestaurant = [
+            { id: 'rest_demo_1', date: today, dishName: 'Smoked pork dry fry / chilli', porkType: 'Smoked Pork', porkQty: 4.50, portions: 22, saleAmount: 5500.00, paymentMode: 'Online' },
+            { id: 'rest_demo_2', date: today, dishName: 'Smoked pork dry fry / chilli Half', porkType: 'Smoked Pork', porkQty: 3.20, portions: 16, saleAmount: 3840.00, paymentMode: 'Cash' },
+            { id: 'rest_demo_3', date: day2, dishName: 'Smoked pork fried rice', porkType: 'Smoked Pork', porkQty: 5.00, portions: 25, saleAmount: 6250.00, paymentMode: 'Online' }
+          ];
+          const demoWholesale = [
+            { id: 'ws_demo_1', date: today, customerName: 'Hotel Hornbill Kitchen', contact: '98640-41290', porkType: 'Smoked Pork', qty: 12.00, pricePerKg: 560.00, totalAmount: 6720.00, receivedAmount: 4000.00, creditAmount: 2720.00, note: 'Balance promised on Monday via UPI' },
+            { id: 'ws_demo_2', date: today, customerName: 'Biren Boro', contact: '94351-77812', porkType: 'Smoked Pork', qty: 3.50, pricePerKg: 580.00, totalAmount: 2030.00, receivedAmount: 2030.00, creditAmount: 0.00, note: 'Paid cash at counter' }
+          ];
+
+          const promises = [];
+          demoPurchases.forEach(p => promises.push(supabaseClient.from(TABLES.purchases.table).upsert({ id: p.id, data: p })));
+          demoExpenses.forEach(x => promises.push(supabaseClient.from(TABLES.expenses.table).upsert({ id: x.id, data: x })));
+          demoRestaurant.forEach(r => promises.push(supabaseClient.from(TABLES.restaurantSales.table).upsert({ id: r.id, data: r })));
+          demoWholesale.forEach(w => promises.push(supabaseClient.from(TABLES.wholesaleSales.table).upsert({ id: w.id, data: w })));
+          await Promise.all(promises);
+          await Promise.all(Object.values(TABLES).map(cfg => fetchTableData(cfg.table, cfg.stateKey)));
+          showToast('Demo data successfully uploaded to Supabase cloud!');
+        }
+      });
+    }
+
+    function confirmClearAllData() {
+      openModal({
+        title: 'Clear All Cloud Data?',
+        message: 'This will permanently delete all records from your live Supabase cloud database.',
+        confirmText: 'Yes, Clear Cloud Database',
+        confirmClass: 'bg-rose-600 hover:bg-rose-700',
+        onConfirm: async () => {
+          showToast('Deleting all records from Supabase cloud...');
+          for (const cfg of Object.values(TABLES)) {
+            const { error } = await supabaseClient.from(cfg.table).delete().not('id', 'is', null);
+            if (error) {
+              showToast(`Error clearing ${cfg.table}: ${error.message}`, 'error');
+            }
+            state[cfg.stateKey] = [];
+          }
+          refreshAllUI();
+          showToast('All Supabase cloud records cleared.');
+        }
+      });
+    }
+
+    // Refresh UI
+    function refreshAllUI() {
+      updateDashboardKPIs();
+      renderBuyingTable();
+      renderExpensesTable();
+      renderRestaurantTables();
+      renderWholesaleTable();
+      if (state.activeTab === 'reports') {
+        populateReportYears();
+        renderReport();
+      }
+    }
+
+    // Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      const today = getTodayISO();
+      document.getElementById('buy-date').value = today;
+      document.getElementById('exp-date').value = today;
+      document.getElementById('rest-date').value = today;
+      document.getElementById('ws-date').value = today;
+      document.getElementById('rep-date-input').value = today;
+      document.getElementById('rep-month-input').value = getCurrentMonthISO();
+
+      // Start initial fetch + real-time Supabase listeners
+      initCloudListeners();
+    });
+  </script>
+</body>
+</html>
