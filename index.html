@@ -79,6 +79,62 @@
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-emerald-100 selection:text-emerald-900">
 
+  <!-- PIN Lock Screen Overlay -->
+  <div id="pin-lock-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4 no-print">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-white">
+      <div class="flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 mx-auto">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      </div>
+
+      <div class="text-center mt-4">
+        <h2 id="pin-screen-title" class="text-lg font-extrabold tracking-tight text-white">PorkOps PIN Lock</h2>
+        <p id="pin-screen-subtitle" class="text-xs text-slate-400 mt-1">Enter your PIN to access financial & inventory records</p>
+      </div>
+
+      <form id="pin-auth-form" class="mt-5 space-y-3.5" onsubmit="handlePinFormSubmit(event)">
+        <div>
+          <label for="pin-input" id="pin-input-label" class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">PIN (4–8 digits)</label>
+          <input
+            type="password"
+            id="pin-input"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="8"
+            autocomplete="off"
+            placeholder="••••"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-center text-lg font-extrabold tracking-[0.35em] text-white placeholder:tracking-normal placeholder:font-medium placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+        </div>
+
+        <div id="pin-confirm-container" class="hidden">
+          <label for="pin-confirm-input" class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Confirm PIN</label>
+          <input
+            type="password"
+            id="pin-confirm-input"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="8"
+            autocomplete="off"
+            placeholder="••••"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-center text-lg font-extrabold tracking-[0.35em] text-white placeholder:tracking-normal placeholder:font-medium placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+        </div>
+
+        <p id="pin-error-msg" class="text-xs font-semibold text-rose-400 min-h-[1rem] text-center"></p>
+
+        <button type="submit" id="pin-submit-btn" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xs transition cursor-pointer">
+          Unlock Portal
+        </button>
+      </form>
+
+      <div id="pin-setup-note" class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 text-center hidden">
+        PIN is stored locally in this browser to guard quick screen access. You can change or disable it anytime from <strong class="text-slate-200">PIN Settings</strong>.
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Banner -->
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none no-print"></div>
 
@@ -96,6 +152,59 @@
         <button id="modal-cancel-btn" type="button" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">Cancel</button>
         <button id="modal-confirm-btn" type="button" class="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-700 hover:bg-emerald-800 transition shadow-xs cursor-pointer">Confirm</button>
       </div>
+    </div>
+  </div>
+
+  <!-- PIN Settings Modal -->
+  <div id="pin-settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 no-print">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">PIN Lock & Auto-Lock Settings</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Manage portal unlock PIN and inactivity timeout</p>
+        </div>
+        <button type="button" onclick="closePinSettingsModal()" class="text-slate-400 hover:text-slate-700 text-sm font-bold px-2 py-1 rounded-lg cursor-pointer">✕</button>
+      </div>
+
+      <form id="pin-settings-form" class="mt-4 space-y-3.5" onsubmit="savePinSettings(event)">
+        <div id="current-pin-group">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Current PIN *</label>
+          <input type="password" id="settings-current-pin" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="Enter current PIN" class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">New PIN (4–8 digits)</label>
+            <input type="password" id="settings-new-pin" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="Leave blank to keep" class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Confirm New PIN</label>
+            <input type="password" id="settings-confirm-pin" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="Re-enter new PIN" class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Auto-Lock on Inactivity</label>
+          <select id="settings-autolock-minutes" class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+            <option value="0">Disabled (Manual Lock Only)</option>
+            <option value="5">After 5 minutes</option>
+            <option value="15">After 15 minutes</option>
+            <option value="30">After 30 minutes</option>
+          </select>
+        </div>
+
+        <p id="pin-settings-error" class="text-xs font-semibold text-rose-600 min-h-[1rem]"></p>
+
+        <div class="pt-2 flex flex-wrap items-center justify-between gap-2">
+          <button type="button" id="disable-pin-btn" onclick="disablePinLock()" class="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer">
+            Disable PIN Lock
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" onclick="closePinSettingsModal()" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-700 hover:bg-emerald-800 transition shadow-xs cursor-pointer">Save Settings</button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -125,6 +234,14 @@
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             Cloud Live (Supabase)
           </span>
+          <button onclick="openPinSettingsModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition cursor-pointer" title="Configure PIN & Auto-Lock">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            PIN Settings
+          </button>
+          <button id="lock-now-btn" onclick="lockPortalNow()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 transition cursor-pointer" title="Lock Portal Screen">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            Lock Now
+          </button>
           <button onclick="loadDemoData()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 transition cursor-pointer">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
             Load Demo Data
@@ -138,10 +255,6 @@
             Restore Backup
           </button>
           <input type="file" id="restore-file-input" accept=".json" class="hidden" onchange="restoreJSONBackup(event)" />
-          <button onclick="confirmClearAllData()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-rose-950/80 text-rose-300 border border-slate-700 hover:border-rose-800 transition cursor-pointer">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-            Clear All
-          </button>
         </div>
       </div>
 
@@ -910,14 +1023,30 @@
           </div>
         </div>
 
-        <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+        <div class="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div class="lg:col-span-5 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
             <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">Expenses Breakdown by Category</h4>
-            <div id="rep-exp-cat-list" class="space-y-1 text-xs text-slate-700 tabular-nums"></div>
+            <div id="rep-exp-cat-list" class="space-y-1.5 text-xs text-slate-700 tabular-nums"></div>
           </div>
-          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">Expenses Breakdown by Payer</h4>
-            <div id="rep-exp-payer-list" class="space-y-1 text-xs text-slate-700 tabular-nums"></div>
+          <div class="lg:col-span-7 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600">Outflows by Payer (Expenses + Pork Purchases)</h4>
+              <span class="text-[11px] font-semibold text-slate-400">Partner / Account Contribution</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs tabular-nums">
+                <thead>
+                  <tr class="border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500">
+                    <th class="py-1.5 pr-2">Paid By</th>
+                    <th class="py-1.5 px-2 text-right">Pork Purchases</th>
+                    <th class="py-1.5 px-2 text-right">Expenses</th>
+                    <th class="py-1.5 pl-2 text-right">Total Paid</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-payer-combined-body" class="divide-y divide-slate-200/70"></tbody>
+                <tfoot id="rep-payer-combined-foot" class="border-t-2 border-slate-300 font-bold text-slate-900"></tfoot>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -1052,6 +1181,13 @@
       wholesaleSales: { table: 'porkops_wholesale', stateKey: 'wholesaleSales' }
     };
 
+    // PIN Lock Storage Keys
+    const PIN_STORAGE_KEY = 'porkops_pin_hash_v1';
+    const AUTOLOCK_STORAGE_KEY = 'porkops_autolock_minutes_v1';
+
+    let autoLockTimerId = null;
+    let isPortalUnlocked = false;
+
     // Application State
     let state = {
       purchases: [],
@@ -1061,6 +1197,244 @@
       activeTab: 'buying',
       reportPeriodType: 'daily'
     };
+
+    // =========================================================================
+    // PIN LOCK & AUTO-LOCK LOGIC
+    // =========================================================================
+    function hashPinValue(pin) {
+      let hash = 2166136261;
+      const salted = `porkops_salt::${pin}`;
+      for (let i = 0; i < salted.length; i++) {
+        hash ^= salted.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0).toString(16).padStart(8, '0');
+    }
+
+    function isPinConfigured() {
+      return Boolean(localStorage.getItem(PIN_STORAGE_KEY));
+    }
+
+    function getAutoLockMinutes() {
+      const saved = parseInt(localStorage.getItem(AUTOLOCK_STORAGE_KEY) || '0', 10);
+      return Number.isNaN(saved) ? 0 : saved;
+    }
+
+    function resetAutoLockTimer() {
+      if (autoLockTimerId) {
+        clearTimeout(autoLockTimerId);
+        autoLockTimerId = null;
+      }
+      const minutes = getAutoLockMinutes();
+      if (!isPinConfigured() || !isPortalUnlocked || minutes <= 0) return;
+
+      autoLockTimerId = setTimeout(() => {
+        lockPortalNow('Session locked due to inactivity.');
+      }, minutes * 60 * 1000);
+    }
+
+    function updateLockScreenUI(message = '') {
+      const screen = document.getElementById('pin-lock-screen');
+      const titleEl = document.getElementById('pin-screen-title');
+      const subtitleEl = document.getElementById('pin-screen-subtitle');
+      const labelEl = document.getElementById('pin-input-label');
+      const confirmBox = document.getElementById('pin-confirm-container');
+      const submitBtn = document.getElementById('pin-submit-btn');
+      const setupNote = document.getElementById('pin-setup-note');
+      const errEl = document.getElementById('pin-error-msg');
+      const pinInput = document.getElementById('pin-input');
+      const confirmInput = document.getElementById('pin-confirm-input');
+
+      screen.classList.remove('hidden');
+      screen.classList.add('flex');
+      document.body.classList.add('overflow-hidden');
+
+      pinInput.value = '';
+      confirmInput.value = '';
+      errEl.textContent = message;
+
+      if (!isPinConfigured()) {
+        titleEl.textContent = 'Set Up Portal PIN';
+        subtitleEl.textContent = 'Create a 4–8 digit PIN to protect financial & inventory data';
+        labelEl.textContent = 'Create PIN (4–8 digits)';
+        confirmBox.classList.remove('hidden');
+        submitBtn.textContent = 'Set PIN & Unlock';
+        setupNote.classList.remove('hidden');
+      } else {
+        titleEl.textContent = 'PorkOps PIN Lock';
+        subtitleEl.textContent = 'Enter your PIN to access financial & inventory records';
+        labelEl.textContent = 'Enter PIN';
+        confirmBox.classList.add('hidden');
+        submitBtn.textContent = 'Unlock Portal';
+        setupNote.classList.add('hidden');
+      }
+
+      setTimeout(() => pinInput.focus(), 50);
+    }
+
+    function unlockPortal() {
+      isPortalUnlocked = true;
+      const screen = document.getElementById('pin-lock-screen');
+      screen.classList.add('hidden');
+      screen.classList.remove('flex');
+      document.body.classList.remove('overflow-hidden');
+      document.getElementById('pin-error-msg').textContent = '';
+      resetAutoLockTimer();
+    }
+
+    function lockPortalNow(reasonMsg = '') {
+      if (!isPinConfigured()) {
+        openPinSettingsModal();
+        showToast('Set a PIN first to enable quick screen lock.');
+        return;
+      }
+      isPortalUnlocked = false;
+      if (autoLockTimerId) {
+        clearTimeout(autoLockTimerId);
+        autoLockTimerId = null;
+      }
+      updateLockScreenUI(reasonMsg);
+    }
+
+    function handlePinFormSubmit(e) {
+      e.preventDefault();
+      const pinInput = document.getElementById('pin-input');
+      const confirmInput = document.getElementById('pin-confirm-input');
+      const errEl = document.getElementById('pin-error-msg');
+      const pinVal = pinInput.value.trim();
+
+      if (!/^\d{4,8}$/.test(pinVal)) {
+        errEl.textContent = 'PIN must be 4 to 8 digits.';
+        pinInput.focus();
+        return;
+      }
+
+      if (!isPinConfigured()) {
+        const confirmVal = confirmInput.value.trim();
+        if (pinVal !== confirmVal) {
+          errEl.textContent = 'PINs do not match. Please re-enter.';
+          confirmInput.focus();
+          return;
+        }
+        localStorage.setItem(PIN_STORAGE_KEY, hashPinValue(pinVal));
+        showToast('PIN lock enabled for this portal.');
+        unlockPortal();
+        return;
+      }
+
+      if (hashPinValue(pinVal) !== localStorage.getItem(PIN_STORAGE_KEY)) {
+        errEl.textContent = 'Incorrect PIN. Please try again.';
+        pinInput.value = '';
+        pinInput.focus();
+        return;
+      }
+
+      unlockPortal();
+      showToast('Portal unlocked.');
+    }
+
+    function openPinSettingsModal() {
+      const modal = document.getElementById('pin-settings-modal');
+      const currentGroup = document.getElementById('current-pin-group');
+      const disableBtn = document.getElementById('disable-pin-btn');
+      const configured = isPinConfigured();
+
+      document.getElementById('settings-current-pin').value = '';
+      document.getElementById('settings-new-pin').value = '';
+      document.getElementById('settings-confirm-pin').value = '';
+      document.getElementById('settings-autolock-minutes').value = String(getAutoLockMinutes());
+      document.getElementById('pin-settings-error').textContent = '';
+
+      currentGroup.classList.toggle('hidden', !configured);
+      disableBtn.classList.toggle('hidden', !configured);
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePinSettingsModal() {
+      const modal = document.getElementById('pin-settings-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function savePinSettings(e) {
+      e.preventDefault();
+      const configured = isPinConfigured();
+      const currentPin = document.getElementById('settings-current-pin').value.trim();
+      const newPin = document.getElementById('settings-new-pin').value.trim();
+      const confirmPin = document.getElementById('settings-confirm-pin').value.trim();
+      const autoLockMins = parseInt(document.getElementById('settings-autolock-minutes').value, 10) || 0;
+      const errEl = document.getElementById('pin-settings-error');
+
+      if (configured && hashPinValue(currentPin) !== localStorage.getItem(PIN_STORAGE_KEY)) {
+        errEl.textContent = 'Current PIN is incorrect.';
+        return;
+      }
+
+      if (!configured && !/^\d{4,8}$/.test(newPin)) {
+        errEl.textContent = 'Please set a 4 to 8 digit PIN.';
+        return;
+      }
+
+      if (newPin) {
+        if (!/^\d{4,8}$/.test(newPin)) {
+          errEl.textContent = 'New PIN must be 4 to 8 digits.';
+          return;
+        }
+        if (newPin !== confirmPin) {
+          errEl.textContent = 'New PIN and confirmation do not match.';
+          return;
+        }
+        localStorage.setItem(PIN_STORAGE_KEY, hashPinValue(newPin));
+      }
+
+      localStorage.setItem(AUTOLOCK_STORAGE_KEY, String(autoLockMins));
+      resetAutoLockTimer();
+      closePinSettingsModal();
+      showToast('PIN lock settings saved.');
+    }
+
+    function disablePinLock() {
+      if (!isPinConfigured()) return;
+      const currentPin = document.getElementById('settings-current-pin').value.trim();
+      const errEl = document.getElementById('pin-settings-error');
+
+      if (hashPinValue(currentPin) !== localStorage.getItem(PIN_STORAGE_KEY)) {
+        errEl.textContent = 'Enter your current PIN above to disable PIN lock.';
+        return;
+      }
+
+      localStorage.removeItem(PIN_STORAGE_KEY);
+      localStorage.setItem(AUTOLOCK_STORAGE_KEY, '0');
+      if (autoLockTimerId) {
+        clearTimeout(autoLockTimerId);
+        autoLockTimerId = null;
+      }
+      isPortalUnlocked = true;
+      closePinSettingsModal();
+      showToast('PIN lock disabled.');
+    }
+
+    function initPinLock() {
+      isPortalUnlocked = false;
+      updateLockScreenUI();
+
+      ['click', 'keydown', 'mousemove', 'touchstart'].forEach(evtName => {
+        window.addEventListener(evtName, () => {
+          if (isPortalUnlocked) resetAutoLockTimer();
+        }, { passive: true });
+      });
+
+      document.addEventListener('keydown', (e) => {
+        const lockScreen = document.getElementById('pin-lock-screen');
+        if (!lockScreen.classList.contains('hidden') && e.key === 'Escape') {
+          document.getElementById('pin-input').value = '';
+          document.getElementById('pin-confirm-input').value = '';
+          document.getElementById('pin-error-msg').textContent = '';
+        }
+      });
+    }
 
     // Formatting Helpers
     const formatINR = (num) => {
@@ -1086,10 +1460,10 @@
     const escapeHTML = (str) => {
       if (!str) return '';
       return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/&/g, '&')
+        .replace(/</g, '<')
+        .replace(/>/g, '>')
+        .replace(/"/g, '"');
     };
 
     // Toast Notification
@@ -1173,12 +1547,10 @@
     async function initCloudListeners() {
       const badge = document.getElementById('cloud-status-badge');
 
-      // Initial load of all tables
       await Promise.all(
         Object.values(TABLES).map(cfg => fetchTableData(cfg.table, cfg.stateKey))
       );
 
-      // Subscribe to real-time changes across all four tables
       const channel = supabaseClient.channel('porkops-realtime-sync');
 
       Object.values(TABLES).forEach(cfg => {
@@ -1222,7 +1594,6 @@
 
         if (error) throw error;
 
-        // Optimistically update local state immediately while realtime broadcasts to other clients
         const idx = state[stateKey].findIndex(item => item.id === record.id);
         if (idx >= 0) state[stateKey][idx] = record;
         else state[stateKey].push(record);
@@ -2116,12 +2487,29 @@
 
       const totalExpenses = expenses.reduce((s, x) => s + x.amount, 0);
       const expCat = { Wood: 0, Maintenance: 0, Others: 0, CapEx: 0 };
-      const expPayer = { 'Spice Jewel': 0, 'Digu': 0, 'Chetan': 0, 'Koka': 0 };
+
+      // Build unified payer breakdown (Pork Purchases + Expenses)
+      const defaultPayers = ['Spice Jewel', 'Digu', 'Chetan', 'Koka'];
+      const payerCombined = {};
+      defaultPayers.forEach(payer => {
+        payerCombined[payer] = { pork: 0, expenses: 0, total: 0 };
+      });
+
+      purchases.forEach(p => {
+        const payer = p.paidBy || 'Spice Jewel';
+        if (!payerCombined[payer]) payerCombined[payer] = { pork: 0, expenses: 0, total: 0 };
+        payerCombined[payer].pork += p.totalAmount;
+        payerCombined[payer].total += p.totalAmount;
+      });
+
       expenses.forEach(x => {
         if (expCat[x.category] !== undefined) expCat[x.category] += x.amount;
         else expCat[x.category] = x.amount;
-        if (expPayer[x.paidBy] !== undefined) expPayer[x.paidBy] += x.amount;
-        else expPayer[x.paidBy] = x.amount;
+
+        const payer = x.paidBy || 'Spice Jewel';
+        if (!payerCombined[payer]) payerCombined[payer] = { pork: 0, expenses: 0, total: 0 };
+        payerCombined[payer].expenses += x.amount;
+        payerCombined[payer].total += x.amount;
       });
 
       const restRev = restaurant.reduce((s, r) => s + r.saleAmount, 0);
@@ -2143,7 +2531,7 @@
         purchases, expenses, restaurant, wholesale,
         metrics: {
           totalBuyCost, totalRawKg, totalSmokedKg,
-          totalExpenses, expCat, expPayer,
+          totalExpenses, expCat, payerCombined,
           restRev, restKg,
           otherRev, otherRec, otherCredit, otherKg,
           totalGrossRev, totalCashCollected, totalOutflows, netProfit, marginPct
@@ -2184,9 +2572,30 @@
         <div class="flex justify-between"><span>${cat}:</span><strong class="text-slate-900">${formatINR(amt)}</strong></div>
       `).join('');
 
-      document.getElementById('rep-exp-payer-list').innerHTML = Object.entries(m.expPayer).map(([payer, amt]) => `
-        <div class="flex justify-between"><span>${payer}:</span><strong class="text-slate-900">${formatINR(amt)}</strong></div>
-      `).join('');
+      // Render Combined Payer Table (Pork Purchases + Expenses)
+      let sumPayerPork = 0, sumPayerExp = 0, sumPayerTotal = 0;
+      document.getElementById('rep-payer-combined-body').innerHTML = Object.entries(m.payerCombined).map(([payer, vals]) => {
+        sumPayerPork += vals.pork;
+        sumPayerExp += vals.expenses;
+        sumPayerTotal += vals.total;
+        return `
+          <tr>
+            <td class="py-1.5 pr-2 font-semibold text-slate-800">${escapeHTML(payer)}</td>
+            <td class="py-1.5 px-2 text-right text-slate-700">${formatINR(vals.pork)}</td>
+            <td class="py-1.5 px-2 text-right text-rose-700">${formatINR(vals.expenses)}</td>
+            <td class="py-1.5 pl-2 text-right font-extrabold text-slate-900">${formatINR(vals.total)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('rep-payer-combined-foot').innerHTML = `
+        <tr>
+          <td class="py-1.5 pr-2">Total Outflows</td>
+          <td class="py-1.5 px-2 text-right">${formatINR(sumPayerPork)}</td>
+          <td class="py-1.5 px-2 text-right text-rose-700">${formatINR(sumPayerExp)}</td>
+          <td class="py-1.5 pl-2 text-right text-slate-950">${formatINR(sumPayerTotal)}</td>
+        </tr>
+      `;
 
       document.getElementById('rep-buy-body').innerHTML = data.purchases.length === 0
         ? `<tr><td colspan="7" class="py-4 text-center text-slate-400">No purchase records in this period.</td></tr>`
@@ -2276,10 +2685,25 @@
       rows.push(['Total Smoked Yield Produced (kg)', m.totalSmokedKg.toFixed(2)]);
       rows.push([]);
 
+      rows.push(['OUTFLOWS BY PAYER (EXPENSES + PORK PURCHASES)']);
+      rows.push(['Paid By', 'Pork Purchases (INR)', 'Expenses (INR)', 'Total Paid (INR)']);
+      Object.entries(m.payerCombined).forEach(([payer, vals]) => {
+        rows.push([payer, vals.pork.toFixed(2), vals.expenses.toFixed(2), vals.total.toFixed(2)]);
+      });
+      rows.push(['TOTAL', m.totalBuyCost.toFixed(2), m.totalExpenses.toFixed(2), m.totalOutflows.toFixed(2)]);
+      rows.push([]);
+
       rows.push(['1. PORK BUYING & SMOKE YIELD DETAILS']);
       rows.push(['Date', 'Supplier', 'Raw Qty (kg)', 'Total Amount (INR)', 'Payment Mode', 'Paid By', 'Smoked Qty (kg)', 'Eff Cost/kg (INR)']);
       data.purchases.forEach(p => {
         rows.push([p.date, p.supplier, p.qty.toFixed(2), p.totalAmount.toFixed(2), p.paymentMode, p.paidBy, p.smokedQty.toFixed(2), p.effectiveSmokedCost.toFixed(2)]);
+      });
+      rows.push([]);
+
+      rows.push(['2. OPERATING EXPENSES DETAILS']);
+      rows.push(['Date', 'Category', 'Description', 'Paid By', 'Amount (INR)']);
+      data.expenses.forEach(x => {
+        rows.push([x.date, x.category, x.description, x.paidBy, x.amount.toFixed(2)]);
       });
 
       const csvContent = rows.map(r => r.map(escCSV).join(',')).join('\n');
@@ -2340,27 +2764,6 @@
       });
     }
 
-    function confirmClearAllData() {
-      openModal({
-        title: 'Clear All Cloud Data?',
-        message: 'This will permanently delete all records from your live Supabase cloud database.',
-        confirmText: 'Yes, Clear Cloud Database',
-        confirmClass: 'bg-rose-600 hover:bg-rose-700',
-        onConfirm: async () => {
-          showToast('Deleting all records from Supabase cloud...');
-          for (const cfg of Object.values(TABLES)) {
-            const { error } = await supabaseClient.from(cfg.table).delete().not('id', 'is', null);
-            if (error) {
-              showToast(`Error clearing ${cfg.table}: ${error.message}`, 'error');
-            }
-            state[cfg.stateKey] = [];
-          }
-          refreshAllUI();
-          showToast('All Supabase cloud records cleared.');
-        }
-      });
-    }
-
     // Refresh UI
     function refreshAllUI() {
       updateDashboardKPIs();
@@ -2384,7 +2787,7 @@
       document.getElementById('rep-date-input').value = today;
       document.getElementById('rep-month-input').value = getCurrentMonthISO();
 
-      // Start initial fetch + real-time Supabase listeners
+      initPinLock();
       initCloudListeners();
     });
   </script>
