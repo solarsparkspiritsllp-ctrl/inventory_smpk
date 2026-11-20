@@ -649,7 +649,7 @@
         <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6">
           <div class="pb-4 border-b border-slate-100">
             <h2 class="text-base font-bold text-slate-900">Record Restaurant Item-Wise Sale</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Track dish revenue alongside exact pork quantity consumed per dish</p>
+            <p class="text-xs text-slate-500 mt-0.5">Auto-calculates Total Dish Sale Amount from pork quantity & per-kg price</p>
           </div>
 
           <form id="restaurant-form" class="mt-4 space-y-3.5">
@@ -669,44 +669,56 @@
 
             <div>
               <label class="block text-xs font-semibold text-slate-700 mb-1">Restaurant Dish / Item Name *</label>
-              <input type="text" id="rest-dish" list="dish-presets" required placeholder="Select or type dish name..." class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              <input type="text" id="rest-dish" list="dish-presets" required placeholder="Select or type dish name..." oninput="recalcRestaurantForm('dish')" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600" />
               <datalist id="dish-presets">
                 <option value="Smoked pork dry fry / chilli">
-                <option value="Smoked pork dry fry / chilli Half">
-                <option value="Smoked pork fried rice">
-                <option value="Smoked pork noodles">
+                <option value="Smoked pork dry fry / chilli half">
+                <option value="Smoked pork fried rice/noodles">
               </datalist>
               <div class="flex flex-wrap gap-1.5 mt-2">
                 <button type="button" onclick="setDishPreset('Smoked pork dry fry / chilli', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Dry Fry / Chilli</button>
-                <button type="button" onclick="setDishPreset('Smoked pork dry fry / chilli Half', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Chilli (Half)</button>
-                <button type="button" onclick="setDishPreset('Smoked pork fried rice', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Fried Rice</button>
-                <button type="button" onclick="setDishPreset('Smoked pork noodles', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Noodles</button>
+                <button type="button" onclick="setDishPreset('Smoked pork dry fry / chilli half', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Chilli (Half)</button>
+                <button type="button" onclick="setDishPreset('Smoked pork fried rice/noodles', 'Smoked Pork')" class="text-[11px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 font-medium transition cursor-pointer">+ Fried Rice / Noodles</button>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Pork Type Used *</label>
-                <select id="rest-pork-type" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                <select id="rest-pork-type" onchange="recalcRestaurantForm('type')" class="w-full rounded-xl border border-slate-300 px-2.5 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
                   <option value="Smoked Pork">Smoked Pork</option>
                   <option value="Raw Pork">Raw Pork</option>
                 </select>
               </div>
               <div>
+                <label id="rest-pork-price-label" class="block text-xs font-semibold text-amber-900 mb-1">Smoke Pork / kg (₹) *</label>
+                <input type="number" id="rest-pork-price" step="0.01" min="0" value="550" placeholder="e.g., 550" oninput="recalcRestaurantForm('price')" class="w-full rounded-xl border border-amber-300 bg-amber-50/40 px-2.5 py-2 text-sm font-semibold text-amber-950 tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Raw Smoke Pork (kg) *</label>
+                <input type="number" id="rest-raw-smoke-qty" step="0.01" min="0" placeholder="e.g., 2.50" oninput="recalcRestaurantForm('rawSmokeQty')" class="w-full rounded-xl border border-sky-300 bg-sky-50/40 px-2.5 py-2 text-sm font-semibold text-sky-950 tabular-nums focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              </div>
+              <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Pork Qty Used (kg) *</label>
-                <input type="number" id="rest-pork-qty" step="0.01" min="0.01" required placeholder="e.g., 2.50" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                <input type="number" id="rest-pork-qty" step="0.01" min="0.01" required placeholder="e.g., 2.50" oninput="recalcRestaurantForm('qty')" class="w-full rounded-xl border border-slate-300 px-2.5 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
               </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Plates / Portions Sold</label>
-                <input type="number" id="rest-portions" step="1" min="1" placeholder="e.g., 12" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                <input type="number" id="rest-portions" step="1" min="1" placeholder="e.g., 12" oninput="recalcRestaurantForm('portions')" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
               </div>
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Total Dish Sale Amount (₹) *</label>
-                <input type="number" id="rest-amount" step="0.01" min="0" required placeholder="e.g., 3600" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-emerald-800 tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                <input type="number" id="rest-amount" step="0.01" min="0" required placeholder="0.00" oninput="recalcRestaurantForm('amount')" class="w-full rounded-xl border border-emerald-300 bg-emerald-50/40 px-3 py-2 text-sm font-bold text-emerald-800 tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-600" />
               </div>
+            </div>
+
+            <!-- Live Formula & Portion Breakdown Box -->
+            <div class="px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 flex flex-wrap items-center justify-between gap-2 text-xs tabular-nums">
+              <span id="rest-formula-preview" class="text-slate-600 font-medium">Formula: Raw Smoke Pork (kg) × Smoke Pork Price/kg</span>
+              <span id="rest-plate-avg-preview" class="font-bold text-emerald-700">Avg: — / plate</span>
             </div>
 
             <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold shadow-xs transition cursor-pointer">
@@ -721,7 +733,7 @@
             <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 class="text-base font-bold text-slate-900">Item-Wise Kitchen Consumption & Revenue Summary</h3>
-                <p class="text-xs text-slate-500">Aggregated pork usage and revenue yield per menu dish</p>
+                <p class="text-xs text-slate-500">Aggregated raw smoke pork, pork used, and revenue yield per menu dish</p>
               </div>
             </div>
             <div class="overflow-x-auto">
@@ -730,9 +742,10 @@
                   <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <th class="py-2.5 px-4">Dish / Menu Item</th>
                     <th class="py-2.5 px-3 text-right">Portions</th>
+                    <th class="py-2.5 px-3 text-right">Raw Smoke (kg)</th>
                     <th class="py-2.5 px-3 text-right">Pork Used (kg)</th>
                     <th class="py-2.5 px-3 text-right">Revenue (₹)</th>
-                    <th class="py-2.5 px-4 text-right">Rev / kg Pork</th>
+                    <th class="py-2.5 px-4 text-right">Rev / kg</th>
                   </tr>
                 </thead>
                 <tbody id="rest-summary-body" class="divide-y divide-slate-100 text-sm">
@@ -753,6 +766,7 @@
                     <th class="py-2.5 px-4">Date</th>
                     <th class="py-2.5 px-3">Dish Item</th>
                     <th class="py-2.5 px-3">Pork Type</th>
+                    <th class="py-2.5 px-3 text-right">Raw Smoke</th>
                     <th class="py-2.5 px-3 text-right">Used (kg)</th>
                     <th class="py-2.5 px-3 text-right">Sale Amt</th>
                     <th class="py-2.5 px-3">Mode</th>
@@ -1187,6 +1201,7 @@
 
     let autoLockTimerId = null;
     let isPortalUnlocked = false;
+    let restAmountManuallyEdited = false;
 
     // Application State
     let state = {
@@ -1460,10 +1475,10 @@
     const escapeHTML = (str) => {
       if (!str) return '';
       return String(str)
-        .replace(/&/g, '&')
-        .replace(/</g, '<')
-        .replace(/>/g, '>')
-        .replace(/"/g, '"');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
     };
 
     // Toast Notification
@@ -1527,8 +1542,22 @@
     }
 
     // =========================================================================
-    // REAL-TIME SUPABASE SYNC (INITIAL FETCH + POSTGRES_CHANGES)
+    // REAL-TIME SUPABASE SYNC (INITIAL FETCH + SAFE REALTIME / POLLING)
     // =========================================================================
+    let cloudPollingTimerId = null;
+
+    function startCloudPollingFallback(badge) {
+      if (badge) {
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>Cloud Sync (Auto-Poll)`;
+      }
+      if (cloudPollingTimerId) return;
+      cloudPollingTimerId = setInterval(() => {
+        if (!document.hidden) {
+          Object.values(TABLES).forEach(cfg => fetchTableData(cfg.table, cfg.stateKey));
+        }
+      }, 15000);
+    }
+
     async function fetchTableData(tableName, stateKey) {
       const { data, error } = await supabaseClient
         .from(tableName)
@@ -1551,39 +1580,58 @@
         Object.values(TABLES).map(cfg => fetchTableData(cfg.table, cfg.stateKey))
       );
 
-      const channel = supabaseClient.channel('porkops-realtime-sync');
+      // Sync default smoked pork price from latest batch if user hasn't typed yet
+      const priceInput = document.getElementById('rest-pork-price');
+      if (priceInput && !document.getElementById('rest-pork-qty').value) {
+        priceInput.value = getDefaultSmokedPorkPrice();
+        recalcRestaurantForm('init');
+      }
 
-      Object.values(TABLES).forEach(cfg => {
-        channel.on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: cfg.table },
-          (payload) => {
-            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-              const updatedItem = { id: payload.new.id, ...payload.new.data };
-              const idx = state[cfg.stateKey].findIndex(item => item.id === updatedItem.id);
-              if (idx >= 0) {
-                state[cfg.stateKey][idx] = updatedItem;
-              } else {
-                state[cfg.stateKey].push(updatedItem);
+      // Guard against sandboxed preview environments where WebSockets are blocked
+      const isSandboxedPreview = window.location.protocol === 'blob:' || typeof window.WebSocket === 'undefined';
+      if (isSandboxedPreview) {
+        startCloudPollingFallback(badge);
+        return;
+      }
+
+      try {
+        const channel = supabaseClient.channel('porkops-realtime-sync');
+
+        Object.values(TABLES).forEach(cfg => {
+          channel.on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: cfg.table },
+            (payload) => {
+              if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                const updatedItem = { id: payload.new.id, ...payload.new.data };
+                const idx = state[cfg.stateKey].findIndex(item => item.id === updatedItem.id);
+                if (idx >= 0) {
+                  state[cfg.stateKey][idx] = updatedItem;
+                } else {
+                  state[cfg.stateKey].push(updatedItem);
+                }
+              } else if (payload.eventType === 'DELETE') {
+                const deletedId = payload.old?.id;
+                if (deletedId) {
+                  state[cfg.stateKey] = state[cfg.stateKey].filter(item => item.id !== deletedId);
+                }
               }
-            } else if (payload.eventType === 'DELETE') {
-              const deletedId = payload.old?.id;
-              if (deletedId) {
-                state[cfg.stateKey] = state[cfg.stateKey].filter(item => item.id !== deletedId);
-              }
+              refreshAllUI();
             }
-            refreshAllUI();
-          }
-        );
-      });
+          );
+        });
 
-      channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>Cloud Live (Supabase)`;
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span>Cloud Polling`;
-        }
-      });
+        channel.subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>Cloud Live (Supabase)`;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED' || err) {
+            try { supabaseClient.removeChannel(channel); } catch (_) {}
+            startCloudPollingFallback(badge);
+          }
+        });
+      } catch (err) {
+        startCloudPollingFallback(badge);
+      }
     }
 
     async function upsertRecordToCloud(tableName, stateKey, record) {
@@ -2053,10 +2101,132 @@
     // =========================================================================
     // MODULE 3: RESTAURANT ITEM-WISE SALES LOGIC
     // =========================================================================
+    function getDefaultSmokedPorkPrice() {
+      if (state.purchases && state.purchases.length > 0) {
+        const sorted = [...state.purchases].sort((a, b) => b.date.localeCompare(a.date));
+        const latestWithTarget = sorted.find(p => Number(p.targetSellPrice) > 0);
+        if (latestWithTarget) return Number(latestWithTarget.targetSellPrice);
+      }
+      return 550;
+    }
+
+    function getDishRecipeDefaults(dishName) {
+      const normalized = (dishName || '').trim().toLowerCase();
+      if (normalized.includes('half')) {
+        return { rawSmokePerPlate: 0.15, dishMultiplier: 1.0 };
+      }
+      if (normalized.includes('fried rice') || normalized.includes('noodles')) {
+        return { rawSmokePerPlate: 0.12, dishMultiplier: 1.1 };
+      }
+      if (normalized.includes('dry fry') || normalized.includes('chilli')) {
+        return { rawSmokePerPlate: 0.25, dishMultiplier: 1.0 };
+      }
+      return { rawSmokePerPlate: 0.20, dishMultiplier: 1.0 };
+    }
+
+    function isSmokeDishName(dishName) {
+      const normalized = (dishName || '').trim().toLowerCase();
+      return (
+        normalized.includes('smoke') ||
+        normalized.includes('fried rice') ||
+        normalized.includes('noodles') ||
+        normalized.includes('dry fry') ||
+        normalized.includes('chilli')
+      );
+    }
+
+    function recalcRestaurantForm(source) {
+      const dishInput = document.getElementById('rest-dish');
+      const porkType = document.getElementById('rest-pork-type').value;
+      const priceLabel = document.getElementById('rest-pork-price-label');
+      const priceInput = document.getElementById('rest-pork-price');
+      const rawSmokeInput = document.getElementById('rest-raw-smoke-qty');
+      const qtyInput = document.getElementById('rest-pork-qty');
+      const portionsInput = document.getElementById('rest-portions');
+      const amountInput = document.getElementById('rest-amount');
+      const formulaPreview = document.getElementById('rest-formula-preview');
+      const plateAvgPreview = document.getElementById('rest-plate-avg-preview');
+
+      const dishName = dishInput.value.trim();
+      const recipe = getDishRecipeDefaults(dishName);
+      const smokeDish = isSmokeDishName(dishName);
+
+      // Update rate label dynamically
+      if (priceLabel) {
+        priceLabel.textContent = (porkType === 'Smoked Pork' || smokeDish)
+          ? 'Smoke Pork / kg (₹) *'
+          : 'Raw Pork / kg (₹) *';
+      }
+
+      if (source === 'amount') {
+        restAmountManuallyEdited = amountInput.value.trim() !== '';
+      }
+
+      const pricePerKg = parseFloat(priceInput.value) || 0;
+      const portions = parseInt(portionsInput.value, 10) || 0;
+      let rawSmokeQty = parseFloat(rawSmokeInput.value) || 0;
+      let porkQty = parseFloat(qtyInput.value) || 0;
+
+      // Sync Raw Smoke Pork Qty (kg) and Pork Qty Used (kg) cleanly across edits
+      if (source === 'rawSmokeQty') {
+        porkQty = rawSmokeQty;
+        qtyInput.value = rawSmokeInput.value !== '' ? rawSmokeQty.toFixed(2) : '';
+      } else if (source === 'qty') {
+        if (smokeDish || rawSmokeInput.value !== '') {
+          rawSmokeQty = porkQty;
+          rawSmokeInput.value = qtyInput.value !== '' ? porkQty.toFixed(2) : '';
+        }
+      } else if (source === 'portions' || source === 'dish' || source === 'preset') {
+        if (portions > 0 && smokeDish && (!rawSmokeInput.value || source === 'portions' || source === 'preset')) {
+          rawSmokeQty = +(portions * recipe.rawSmokePerPlate).toFixed(2);
+          rawSmokeInput.value = rawSmokeQty.toFixed(2);
+          porkQty = rawSmokeQty;
+          qtyInput.value = rawSmokeQty.toFixed(2);
+        }
+      }
+
+      // Formula basis: Raw Smoke Pork Qty (kg) when entered/applicable, otherwise Pork Qty Used (kg)
+      const formulaQty = rawSmokeQty > 0 ? rawSmokeQty : porkQty;
+
+      // Auto-update Total Dish Sale Amount (₹) whenever formula inputs change
+      let totalSale = parseFloat(amountInput.value) || 0;
+      if (source !== 'amount' && !restAmountManuallyEdited) {
+        totalSale = +(formulaQty * pricePerKg * recipe.dishMultiplier).toFixed(2);
+        amountInput.value = (formulaQty > 0 && pricePerKg > 0) ? totalSale.toFixed(2) : '';
+      }
+
+      // Live formula breakdown & per-plate average
+      if (formulaQty > 0 && pricePerKg > 0) {
+        const calcTotal = formulaQty * pricePerKg * recipe.dishMultiplier;
+        const qtyLabel = rawSmokeQty > 0 ? 'Raw Smoke' : 'Pork';
+        const multText = recipe.dishMultiplier !== 1 ? ` × ${recipe.dishMultiplier.toFixed(1)}x` : '';
+        formulaPreview.textContent = restAmountManuallyEdited
+          ? `Base: ${formulaQty.toFixed(2)} kg (${qtyLabel}) × ₹${pricePerKg.toFixed(2)}/kg${multText} = ${formatINR(calcTotal)} (Custom)`
+          : `Formula: ${formulaQty.toFixed(2)} kg (${qtyLabel}) × ₹${pricePerKg.toFixed(2)}/kg${multText} = ${formatINR(calcTotal)}`;
+      } else {
+        formulaPreview.textContent = `Formula: Raw Smoke Pork (kg) × Smoke Pork Price/kg`;
+      }
+
+      if (portions > 0 && totalSale > 0) {
+        const perPlate = totalSale / portions;
+        plateAvgPreview.textContent = `${portions} plates • Avg: ${formatINR(perPlate)} / plate`;
+      } else if (portions > 0) {
+        plateAvgPreview.textContent = `${portions} plates`;
+      } else {
+        plateAvgPreview.textContent = `Avg: — / plate`;
+      }
+    }
+
     function setDishPreset(dishName, porkType) {
       document.getElementById('rest-dish').value = dishName;
       document.getElementById('rest-pork-type').value = porkType;
-      document.getElementById('rest-pork-qty').focus();
+      const priceInput = document.getElementById('rest-pork-price');
+      if (!priceInput.value || parseFloat(priceInput.value) <= 0) {
+        priceInput.value = getDefaultSmokedPorkPrice();
+      }
+      restAmountManuallyEdited = false;
+      recalcRestaurantForm('preset');
+      document.getElementById('rest-raw-smoke-qty').focus();
     }
 
     document.getElementById('restaurant-form').addEventListener('submit', async function(e) {
@@ -2064,9 +2234,15 @@
       const date = document.getElementById('rest-date').value;
       const dishName = document.getElementById('rest-dish').value.trim();
       const porkType = document.getElementById('rest-pork-type').value;
-      const porkQty = parseFloat(document.getElementById('rest-pork-qty').value) || 0;
+      const porkPricePerKg = parseFloat(document.getElementById('rest-pork-price').value) || 0;
+      const rawSmokeQtyInput = parseFloat(document.getElementById('rest-raw-smoke-qty').value);
+      const porkQtyInput = parseFloat(document.getElementById('rest-pork-qty').value) || 0;
+      const rawSmokeQty = !isNaN(rawSmokeQtyInput) && rawSmokeQtyInput > 0 ? rawSmokeQtyInput : porkQtyInput;
+      const porkQty = porkQtyInput > 0 ? porkQtyInput : rawSmokeQty;
       const portions = parseInt(document.getElementById('rest-portions').value, 10) || 0;
-      const saleAmount = parseFloat(document.getElementById('rest-amount').value) || 0;
+      const recipe = getDishRecipeDefaults(dishName);
+      const formulaQty = rawSmokeQty > 0 ? rawSmokeQty : porkQty;
+      const saleAmount = parseFloat(document.getElementById('rest-amount').value) || +(formulaQty * porkPricePerKg * recipe.dishMultiplier).toFixed(2);
       const paymentMode = document.getElementById('rest-payment').value;
 
       if (!dishName || porkQty <= 0) {
@@ -2079,6 +2255,8 @@
         date,
         dishName,
         porkType,
+        porkPricePerKg: +porkPricePerKg.toFixed(2),
+        rawSmokeQty: +rawSmokeQty.toFixed(2),
         porkQty: +porkQty.toFixed(2),
         portions,
         saleAmount: +saleAmount.toFixed(2),
@@ -2088,6 +2266,9 @@
       await saveRestaurantToCloud(record);
       document.getElementById('restaurant-form').reset();
       document.getElementById('rest-date').value = date;
+      document.getElementById('rest-pork-price').value = porkPricePerKg > 0 ? porkPricePerKg : getDefaultSmokedPorkPrice();
+      restAmountManuallyEdited = false;
+      recalcRestaurantForm('reset');
       showToast('Restaurant dish sale recorded to cloud.');
     });
 
@@ -2112,23 +2293,26 @@
       const dishMap = {};
       state.restaurantSales.forEach(r => {
         if (!dishMap[r.dishName]) {
-          dishMap[r.dishName] = { dishName: r.dishName, portions: 0, porkQty: 0, revenue: 0 };
+          dishMap[r.dishName] = { dishName: r.dishName, portions: 0, rawSmokeQty: 0, porkQty: 0, revenue: 0 };
         }
         dishMap[r.dishName].portions += (r.portions || 0);
+        dishMap[r.dishName].rawSmokeQty += (r.rawSmokeQty !== undefined ? Number(r.rawSmokeQty) : Number(r.porkQty) || 0);
         dishMap[r.dishName].porkQty += r.porkQty;
         dishMap[r.dishName].revenue += r.saleAmount;
       });
 
       const dishList = Object.values(dishMap).sort((a, b) => b.revenue - a.revenue);
       if (dishList.length === 0) {
-        summaryBody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-xs text-slate-400">No restaurant dish sales recorded yet.</td></tr>`;
+        summaryBody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-xs text-slate-400">No restaurant dish sales recorded yet.</td></tr>`;
       } else {
         summaryBody.innerHTML = dishList.map(d => {
-          const revPerKg = d.porkQty > 0 ? d.revenue / d.porkQty : 0;
+          const basisKg = d.rawSmokeQty > 0 ? d.rawSmokeQty : d.porkQty;
+          const revPerKg = basisKg > 0 ? d.revenue / basisKg : 0;
           return `
             <tr class="hover:bg-slate-50/85 tabular-nums">
               <td class="py-2.5 px-4 font-semibold text-slate-900">${escapeHTML(d.dishName)}</td>
               <td class="py-2.5 px-3 text-right text-slate-600">${d.portions > 0 ? d.portions : '—'}</td>
+              <td class="py-2.5 px-3 text-right font-semibold text-sky-800">${d.rawSmokeQty.toFixed(2)} kg</td>
               <td class="py-2.5 px-3 text-right font-semibold text-amber-800">${d.porkQty.toFixed(2)} kg</td>
               <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${formatINR(d.revenue)}</td>
               <td class="py-2.5 px-4 text-right text-xs font-semibold text-slate-600">${formatINR(revPerKg)}/kg</td>
@@ -2142,28 +2326,33 @@
         .sort((a, b) => b.date.localeCompare(a.date));
 
       if (filtered.length === 0) {
-        logBody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-xs text-slate-400">No matching restaurant sales entries.</td></tr>`;
+        logBody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-xs text-slate-400">No matching restaurant sales entries.</td></tr>`;
         return;
       }
 
-      logBody.innerHTML = filtered.map(r => `
-        <tr class="hover:bg-slate-50/85 tabular-nums">
-          <td class="py-2.5 px-4 font-medium text-slate-700">${escapeHTML(r.date)}</td>
-          <td class="py-2.5 px-3">
-            <div class="font-semibold text-slate-900">${escapeHTML(r.dishName)}</div>
-            ${r.portions ? `<div class="text-[11px] text-slate-500">${r.portions} plates</div>` : ''}
-          </td>
-          <td class="py-2.5 px-3">
-            <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold ${r.porkType === 'Smoked Pork' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-700'}">${escapeHTML(r.porkType)}</span>
-          </td>
-          <td class="py-2.5 px-3 text-right font-semibold">${r.porkQty.toFixed(2)} kg</td>
-          <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${formatINR(r.saleAmount)}</td>
-          <td class="py-2.5 px-3 text-xs font-medium text-slate-600">${escapeHTML(r.paymentMode)}</td>
-          <td class="py-2.5 px-4 text-right">
-            <button onclick="deleteRestaurantSale('${r.id}')" class="text-xs font-semibold text-rose-600 hover:underline cursor-pointer">Del</button>
-          </td>
-        </tr>
-      `).join('');
+      logBody.innerHTML = filtered.map(r => {
+        const rawSmokeVal = r.rawSmokeQty !== undefined ? Number(r.rawSmokeQty) : Number(r.porkQty) || 0;
+        return `
+          <tr class="hover:bg-slate-50/85 tabular-nums">
+            <td class="py-2.5 px-4 font-medium text-slate-700">${escapeHTML(r.date)}</td>
+            <td class="py-2.5 px-3">
+              <div class="font-semibold text-slate-900">${escapeHTML(r.dishName)}</div>
+              ${r.portions ? `<div class="text-[11px] text-slate-500">${r.portions} plates</div>` : ''}
+            </td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold ${r.porkType === 'Smoked Pork' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-700'}">${escapeHTML(r.porkType)}</span>
+              ${r.porkPricePerKg > 0 ? `<div class="text-[11px] text-slate-500 mt-0.5">@ ${formatINR(r.porkPricePerKg)}/kg</div>` : ''}
+            </td>
+            <td class="py-2.5 px-3 text-right font-semibold text-sky-800">${rawSmokeVal.toFixed(2)} kg</td>
+            <td class="py-2.5 px-3 text-right font-semibold">${r.porkQty.toFixed(2)} kg</td>
+            <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${formatINR(r.saleAmount)}</td>
+            <td class="py-2.5 px-3 text-xs font-medium text-slate-600">${escapeHTML(r.paymentMode)}</td>
+            <td class="py-2.5 px-4 text-right">
+              <button onclick="deleteRestaurantSale('${r.id}')" class="text-xs font-semibold text-rose-600 hover:underline cursor-pointer">Del</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
 
     // =========================================================================
@@ -2743,9 +2932,9 @@
             { id: 'exp_demo_3', date: day2, category: 'CapEx', description: 'Commercial stainless steel meat slicing machine', amount: 14500.00, paidBy: 'Spice Jewel' }
           ];
           const demoRestaurant = [
-            { id: 'rest_demo_1', date: today, dishName: 'Smoked pork dry fry / chilli', porkType: 'Smoked Pork', porkQty: 4.50, portions: 22, saleAmount: 5500.00, paymentMode: 'Online' },
-            { id: 'rest_demo_2', date: today, dishName: 'Smoked pork dry fry / chilli Half', porkType: 'Smoked Pork', porkQty: 3.20, portions: 16, saleAmount: 3840.00, paymentMode: 'Cash' },
-            { id: 'rest_demo_3', date: day2, dishName: 'Smoked pork fried rice', porkType: 'Smoked Pork', porkQty: 5.00, portions: 25, saleAmount: 6250.00, paymentMode: 'Online' }
+            { id: 'rest_demo_1', date: today, dishName: 'Smoked pork dry fry / chilli', porkType: 'Smoked Pork', porkPricePerKg: 550.00, rawSmokeQty: 4.50, porkQty: 4.50, portions: 22, saleAmount: 5500.00, paymentMode: 'Online' },
+            { id: 'rest_demo_2', date: today, dishName: 'Smoked pork dry fry / chilli half', porkType: 'Smoked Pork', porkPricePerKg: 550.00, rawSmokeQty: 3.20, porkQty: 3.20, portions: 16, saleAmount: 3840.00, paymentMode: 'Cash' },
+            { id: 'rest_demo_3', date: day2, dishName: 'Smoked pork fried rice/noodles', porkType: 'Smoked Pork', porkPricePerKg: 550.00, rawSmokeQty: 5.00, porkQty: 5.00, portions: 25, saleAmount: 6250.00, paymentMode: 'Online' }
           ];
           const demoWholesale = [
             { id: 'ws_demo_1', date: today, customerName: 'Hotel Hornbill Kitchen', contact: '98640-41290', porkType: 'Smoked Pork', qty: 12.00, pricePerKg: 560.00, totalAmount: 6720.00, receivedAmount: 4000.00, creditAmount: 2720.00, note: 'Balance promised on Monday via UPI' },
@@ -2787,6 +2976,7 @@
       document.getElementById('rep-date-input').value = today;
       document.getElementById('rep-month-input').value = getCurrentMonthISO();
 
+      recalcRestaurantForm('init');
       initPinLock();
       initCloudListeners();
     });
